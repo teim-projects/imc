@@ -64,8 +64,7 @@ def export_as_csv_action(description="Export selected as CSV", fields=None, head
                 if hasattr(modeladmin, field) and callable(getattr(modeladmin, field)):
                     row.append(getattr(modeladmin, field)(obj))
                 else:
-                    value = getattr(obj, field, "")
-                    row.append(value)
+                    row.append(getattr(obj, field, ""))
             writer.writerow(row)
         return response
 
@@ -79,8 +78,16 @@ def export_as_csv_action(description="Export selected as CSV", fields=None, head
 
 @admin.register(Studio)
 class StudioAdmin(admin.ModelAdmin):
-    list_display = ("studio_name", "customer", "date", "time_slot", "duration", "created_at")
-    search_fields = ("studio_name", "customer", "email", "contact_number")
+    list_display = (
+        "studio_name",
+        "customer",
+        "date",
+        "time_slot",
+        "duration",
+        "payment_methods",
+        "created_at",
+    )
+    search_fields = ("studio_name", "customer", "email", "contact_number", "address")
     list_filter = ("studio_name", "date")
     ordering = ("-date", "-time_slot")
     list_per_page = 25
@@ -89,8 +96,8 @@ class StudioAdmin(admin.ModelAdmin):
 
     actions = [
         export_as_csv_action(fields=[
-            "id", "studio_name", "customer", "date", "time_slot",
-            "duration", "payment_methods", "created_at"
+            "id", "studio_name", "customer", "email", "contact_number", "address",
+            "date", "time_slot", "duration", "payment_methods", "created_at"
         ])
     ]
 
@@ -155,21 +162,56 @@ class PaymentAdmin(admin.ModelAdmin):
 # ======================================
 # ========= VIDEOGRAPHY ADMIN ==========
 # ======================================
-
 @admin.register(Videography)
 class VideographyAdmin(admin.ModelAdmin):
-    list_display = ("project", "editor", "duration", "delivery_date", "created_at")
-    search_fields = ("project", "editor")
-    list_filter = ("delivery_date",)
-    ordering = ("-delivery_date",)
+    list_display = (
+        "id",
+        "client_name",
+        "project",
+        "editor",
+        "shoot_date",
+        "start_time",
+        "duration_display",
+        "package_type",
+        "payment_method",
+        "created_at",
+    )
+    search_fields = (
+        "client_name",
+        "email",
+        "mobile_no",
+        "project",
+        "editor",
+        "location",
+        "notes",
+    )
+    # REMOVE 'drone_needed' unless your model actually has it
+    list_filter = ("shoot_date", "package_type", "payment_method", "editor")
+    ordering = ("-shoot_date", "-created_at")
     list_per_page = 25
-    date_hierarchy = "delivery_date"
+    date_hierarchy = "shoot_date"
     readonly_fields = ("created_at", "updated_at")
 
     actions = [
-        export_as_csv_action(fields=["id", "project", "editor", "duration", "delivery_date", "created_at"])
+        export_as_csv_action(fields=[
+            "id",
+            "client_name", "email", "mobile_no",
+            "project", "editor",
+            "shoot_date", "start_time", "duration_hours",
+            "location", "package_type", "payment_method",
+            # include these only if they exist in your model:
+            # "equipment_needed", "drone_needed",
+            "notes",
+            "created_at",
+        ])
     ]
 
+    def duration_display(self, obj):
+        if obj.duration_hours is None:
+            return "-"
+        return f"{float(obj.duration_hours):g} hrs"
+    duration_display.short_description = "Duration (hrs)"
+    duration_display.admin_order_field = "duration_hours"
 
 # ======================================
 # ========= EQUIPMENT / RENTALS =========

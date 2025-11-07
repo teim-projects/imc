@@ -2,7 +2,18 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Forms.css";
 
-const API_URL = "http://127.0.0.1:8000/api/auth/events/";
+const BASE = import.meta?.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
+const API_URL = `${BASE}/api/auth/events/`;
+
+// Small axios client that injects JWT if present
+const api = axios.create();
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access");
+  if (token) {
+    config.headers = { ...(config.headers || {}), Authorization: `Bearer ${token}` };
+  }
+  return config;
+});
 
 const EventsForm = ({ onClose }) => {
   const [tab, setTab] = useState("ADD");
@@ -11,10 +22,12 @@ const EventsForm = ({ onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState("");
+
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [editingId, setEditingId] = useState(null);
   const pageSize = 8;
+
+  const [editingId, setEditingId] = useState(null);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -24,10 +37,19 @@ const EventsForm = ({ onClose }) => {
     description: "",
   });
 
-  const formatErr = (err) => {
-    if (err?.response?.data) {
-      try { return JSON.stringify(err.response.data, null, 2); }
-      catch (_) { return String(err.response.data); }
+  // ---------------- Helpers ----------------
+  const humanizeErr = (err) => {
+    const data = err?.response?.data;
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      const key = Object.keys(data)[0];
+      const val = data[key];
+      if (Array.isArray(val)) return `${key}: ${val[0]}`;
+      if (typeof val === "string") return `${key}: ${val}`;
+      try {
+        return JSON.stringify(data, null, 2);
+      } catch {
+        return String(data);
+      }
     }
     return err?.message || "Unknown error";
   };
@@ -37,23 +59,41 @@ const EventsForm = ({ onClose }) => {
     setTimeout(() => setSuccess(""), 1800);
   };
 
+  const clearStatus = () => {
+    setError(null);
+    setSuccess("");
+  };
+
+  // ---------------- Fetch ----------------
   const fetchEvents = async () => {
     setLoading(true);
-    setError(null);
+    clearStatus();
     try {
-      const res = await axios.get(API_URL);
-      setEvents(Array.isArray(res.data) ? res.data : []);
+      const res = await api.get(API_URL);
+      const rows = Array.isArray(res.data) ? res.data : res.data?.results ?? res.data ?? [];
+      setEvents(Array.isArray(rows) ? rows : []);
+      // keep page in range if list shrank
+      const totalPagesAfter = Math.max(1, Math.ceil((rows?.length || 0) / pageSize));
+      if (page > totalPagesAfter) setPage(totalPagesAfter);
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchEvents(); }, []);
+  useEffect(() => {
+    fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // ---------------- Form handlers ----------------
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value, type } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "number" ? (value === "" ? "" : Number(value)) : value,
+    }));
   };
 
   const resetForm = () => {
@@ -67,10 +107,26 @@ const EventsForm = ({ onClose }) => {
     setEditingId(null);
   };
 
+  const validate = () => {
+    if (!formData.title?.trim()) return "Title is required.";
+    if (!formData.location?.trim()) return "Location is required.";
+    if (!formData.date?.trim()) return "Date is required.";
+    const price = Number(formData.ticket_price === "" ? 0 : formData.ticket_price);
+    if (Number.isNaN(price) || price < 0) return "Ticket price must be 0 or more.";
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    clearStatus();
     setSaving(true);
+
+    const v = validate();
+    if (v) {
+      setSaving(false);
+      setError(v);
+      return;
+    }
 
     const payload = {
       ...formData,
@@ -80,17 +136,17 @@ const EventsForm = ({ onClose }) => {
 
     try {
       if (editingId) {
-        await axios.put(`${API_URL}${editingId}/`, payload);
+        await api.put(`${API_URL}${editingId}/`, payload);
         toast("✅ Event updated successfully!");
       } else {
-        await axios.post(API_URL, payload);
+        await api.post(API_URL, payload);
         toast("✅ Event added successfully!");
       }
       await fetchEvents();
       resetForm();
       setTab("VIEW");
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     } finally {
       setSaving(false);
     }
@@ -106,21 +162,25 @@ const EventsForm = ({ onClose }) => {
     });
     setEditingId(ev.id);
     setTab("ADD");
-    setError(null);
-    setSuccess("");
+    clearStatus();
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this event?")) return;
     try {
-      await axios.delete(`${API_URL}${id}/`);
+      await api.delete(`${API_URL}${id}/`);
+      // update list and page bounds
+      const after = events.length - 1;
+      const pages = Math.max(1, Math.ceil(after / pageSize));
+      if (page > pages) setPage(pages);
       await fetchEvents();
       toast("🗑️ Deleted");
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     }
   };
 
+  // ---------------- Derived ----------------
   const filtered = useMemo(() => {
     if (!search.trim()) return events;
     const q = search.toLowerCase();
@@ -141,6 +201,7 @@ const EventsForm = ({ onClose }) => {
 
   useEffect(() => { setPage(1); }, [search]);
 
+  // ---------------- UI ----------------
   return (
     <div className="form-container pro">
       {/* ===== HEADER ===== */}
@@ -150,17 +211,21 @@ const EventsForm = ({ onClose }) => {
           <button
             className={`tab ${tab === "ADD" ? "active" : ""}`}
             onClick={() => setTab("ADD")}
+            type="button"
           >
             ➕ Add Event
           </button>
           <button
             className={`tab ${tab === "VIEW" ? "active" : ""}`}
             onClick={() => setTab("VIEW")}
+            type="button"
           >
             👁 View Events
           </button>
         </div>
-        <button className="close-x" onClick={onClose} aria-label="Close">✖</button>
+        {onClose && (
+          <button className="close-x" onClick={onClose} aria-label="Close">✖</button>
+        )}
       </div>
 
       {/* ===== BANNERS ===== */}
@@ -288,8 +353,16 @@ const EventsForm = ({ onClose }) => {
                         <td>{ev.ticket_price}</td>
                         <td>{ev.description || "-"}</td>
                         <td className="right">
-                          <button className="mini" onClick={() => handleEdit(ev)}>✏️ Edit</button>
-                          <button className="mini danger" onClick={() => handleDelete(ev.id)}>🗑 Delete</button>
+                          <button className="mini" onClick={() => handleEdit(ev)} disabled={saving}>
+                            ✏️ Edit
+                          </button>
+                          <button
+                            className="mini danger"
+                            onClick={() => handleDelete(ev.id)}
+                            disabled={saving}
+                          >
+                            🗑 Delete
+                          </button>
                         </td>
                       </tr>
                     ))}

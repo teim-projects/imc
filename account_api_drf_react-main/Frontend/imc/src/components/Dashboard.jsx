@@ -1,10 +1,10 @@
-// Dashboard.jsx
-import React, { useState, useEffect } from "react";
+// Dashboard.jsx — IMC Neo Glass Dashboard (Board-wrapped for ALL sections)
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Sidebar from "./Sidebar";
 import Charts from "./Charts";
 
 import StudioForm from "./Forms/StudioForm";
-import EquipmentForm from "./Forms/EquipmentForm"; // ✅ single valid import
+import EquipmentForm from "./Forms/EquipmentForm";
 import EventsForm from "./Forms/EventsForm";
 import ShowsForm from "./Forms/ShowsForm";
 import PhotographyForm from "./Forms/PhotographyForm";
@@ -13,163 +13,226 @@ import SoundForm from "./Forms/SoundForm";
 import SingerForm from "./Forms/SingerForm";
 import PaymentForm from "./Forms/PaymentForm";
 import UserForm from "./Forms/UserForm";
+import PrivateBookingForm from "./Forms/PrivateBookingForm";
 
 import { motion } from "framer-motion";
 import { FaUsers, FaMicrophone, FaCalendarAlt, FaDollarSign } from "react-icons/fa";
 import CountUp from "react-countup";
 import "./Dashboard.css";
 
-const Dashboard = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [cardsLoaded, setCardsLoaded] = useState(false);
+/* ----------------------------------------------------
+   Allowed keys for safety (prevents bad state values)
+---------------------------------------------------- */
+const ALLOWED_KEYS = new Set([
+  null,
+  "studio", "equipment", "events", "photography", "videography", "sound", "singer", "payment", "user", "private",
+  "addStudio", "viewStudio",
+  "addEquipment", "viewEquipment",
+  "addEvent", "viewEvent",
+  "addShow", "viewShow",
+  "addPrivate", "viewPrivate",
+  "addPhotography", "viewPhotography",
+  "addVideography", "viewVideography",
+]);
 
-  /**
-   * activeForm can be:
-   * Main: "studio","equipment","events","photography","videography","sound","singer","payment","user"
-   * Submenus:
-   *  - Studio: "addStudio","viewStudio"
-   *  - Equipment: "addEquipment","viewEquipment"   ✅
-   *  - Events: "addEvent","viewEvent"
-   *  - Shows: "addShow","viewShow"
-   * null -> Overview
-   */
+const prettyTitle = (k) => {
+  if (!k) return "Overview";
+  const map = {
+    studio: "Studio",
+    equipment: "Equipment",
+    events: "Events",
+    photography: "Photography",
+    videography: "Videography",
+    sound: "Sound",
+    singer: "Singer",
+    payment: "Payment",
+    user: "Users",
+    private: "Private Bookings",
+    addStudio: "Add Studio Booking",
+    viewStudio: "View Studio Bookings",
+    addEquipment: "Add Equipment",
+    viewEquipment: "View Equipment",
+    addEvent: "Add Event",
+    viewEvent: "View Events",
+    addShow: "Add Show",
+    viewShow: "View Shows",
+    addPrivate: "Add Private Booking",
+    viewPrivate: "View Private Bookings",
+    addPhotography: "Add Photography Booking",
+    viewPhotography: "View Photography Bookings",
+    addVideography: "Add Videography Booking",
+    viewVideography: "View Videography Bookings",
+  };
+  return map[k] ?? "Overview";
+};
+
+const defaultTabFor = (key) => (key && key.startsWith("view") ? "VIEW" : "ADD");
+
+export default function Dashboard() {
+  const [sidebarOpen] = useState(true);
+  const [cardsLoaded, setCardsLoaded] = useState(false);
   const [activeForm, setActiveForm] = useState(null);
 
+  const safeSetActiveForm = useCallback((key) => {
+    setActiveForm(ALLOWED_KEYS.has(key) ? key : null);
+  }, []);
+
+  const closeForm = useCallback(() => setActiveForm(null), []);
+
   useEffect(() => {
-    const t = setTimeout(() => setCardsLoaded(true), 400);
+    const base = "IMC Music Hub";
+    document.title = activeForm ? `${prettyTitle(activeForm)} — ${base}` : `${base} — Dashboard`;
+  }, [activeForm]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setCardsLoaded(true), 350);
     return () => clearTimeout(t);
   }, []);
 
-  const cards = [
-    { icon: <FaUsers />, title: "Customers", value: 230, color: "#00bfff" },
-    { icon: <FaMicrophone />, title: "Studio Bookings", value: 45, color: "#0099ff" },
-    { icon: <FaCalendarAlt />, title: "Events", value: 12, color: "#00acee" },
-    { icon: <FaDollarSign />, title: "Revenue (₹)", value: 18000, color: "#0077b6" },
-  ];
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && closeForm();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closeForm]);
 
-  const closeForm = () => setActiveForm(null);
+  // Demo KPI data
+  const cards = useMemo(
+    () => [
+      { icon: <FaUsers />,       title: "Customers",   value: 1750, color: "#9ec4ff" },
+      { icon: <FaMicrophone />,  title: "Bookings",    value: 320,  color: "#9ec4ff" },
+      { icon: <FaCalendarAlt />, title: "Events",      value: 58,   color: "#9ec4ff" },
+      { icon: <FaDollarSign />,  title: "Revenue (₹)", value: 46800, color: "#ffbf4d" },
+    ],
+    []
+  );
 
-  // Some forms (Studio/Equipment) support starting on VIEW; others ignore it.
-  const defaultTabFor = (key) => (key && key.startsWith("view") ? "VIEW" : "ADD");
+  // Render whichever module is active
+  const renderActive = () => {
+    switch (activeForm) {
+      case "studio":          return <StudioForm onClose={closeForm} />;
+      case "equipment":       return <EquipmentForm onClose={closeForm} />;
+      case "events":          return <EventsForm onClose={closeForm} />;
+      case "photography":     return <PhotographyForm onClose={closeForm} />;
+      case "videography":     return <VideographyForm onClose={closeForm} />;
+      case "sound":           return <SoundForm onClose={closeForm} />;
+      case "singer":          return <SingerForm onClose={closeForm} />;
+      case "payment":         return <PaymentForm onClose={closeForm} />;
+      case "user":            return <UserForm onClose={closeForm} />;
+      case "private":         return <PrivateBookingForm onClose={closeForm} />;
+
+      case "addStudio":       return <StudioForm onClose={closeForm} viewOnly={false} />;
+      case "viewStudio":      return <StudioForm onClose={closeForm} viewOnly />;
+
+      case "addEquipment":    return <EquipmentForm onClose={closeForm} viewOnly={false} />;
+      case "viewEquipment":   return <EquipmentForm onClose={closeForm} viewOnly />;
+
+      case "addEvent":        return <EventsForm onClose={closeForm} defaultTab={defaultTabFor("addEvent")} />;
+      case "viewEvent":       return <EventsForm onClose={closeForm} defaultTab={defaultTabFor("viewEvent")} />;
+
+      case "addShow":         return <ShowsForm onClose={closeForm} defaultTab={defaultTabFor("addShow")} />;
+      case "viewShow":        return <ShowsForm onClose={closeForm} defaultTab={defaultTabFor("viewShow")} />;
+
+      case "addPrivate":      return <PrivateBookingForm onClose={closeForm} viewOnly={false} />;
+      case "viewPrivate":     return <PrivateBookingForm onClose={closeForm} viewOnly />;
+
+      case "addPhotography":  return <PhotographyForm onClose={closeForm} viewOnly={false} />;
+      case "viewPhotography": return <PhotographyForm onClose={closeForm} viewOnly />;
+
+      case "addVideography":  return <VideographyForm onClose={closeForm} viewOnly={false} />;
+      case "viewVideography": return <VideographyForm onClose={closeForm} viewOnly />;
+      default:                return null;
+    }
+  };
 
   return (
     <div className="dashboard-container">
-      {/* Sidebar */}
+      {/* Left rail */}
       <Sidebar
-        isOpen={sidebarOpen}
-        toggleSidebar={() => setSidebarOpen((s) => !s)}
-        // top-level menu items open the corresponding form:
-        openModal={(key) => setActiveForm(key)}
-        // submenu items (Add/View) also map to the same state variable:
-        openSubModal={(key) => setActiveForm(key)}
+        openModal={(key) => safeSetActiveForm(key)}
+        openSubModal={(key) => safeSetActiveForm(key)}
+        currentKey={activeForm}
       />
 
-      {/* Main */}
+      {/* Main board */}
       <main className={`dashboard-content ${sidebarOpen ? "expanded" : "collapsed"}`}>
-        <div className="dashboard-main">
-          {/* Overview (shown when no form is selected) */}
-          {!activeForm && (
-            <>
-              <motion.div
-                className="dashboard-header"
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-              >
-                <div className="header-text">
-                  <h2>
-                    Welcome Back, <span>Admin 🎧</span>
-                  </h2>
-                  <p>Manage your studio, bookings, and analytics efficiently</p>
-                </div>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="header-btn"
-                  onClick={() => setActiveForm("events")}
+        <section className="neo-board">
+          <div className="inner">
+            {/* ===== OVERVIEW ===== */}
+            {!activeForm && (
+              <>
+                {/* HERO */}
+                <motion.section
+                  className="neo-hero"
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
                 >
-                  + Add New Event
-                </motion.button>
-              </motion.div>
-
-              {/* KPI Cards */}
-              <div className="dashboard-cards">
-                {cards.map((card, i) => (
-                  <motion.div
-                    key={card.title}
-                    className={`card ${cardsLoaded ? "loaded" : ""}`}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.15 }}
-                    whileHover={{ scale: 1.04 }}
-                  >
-                    <div className="card-icon" style={{ color: card.color }}>
-                      {card.icon}
+                  <div className="hero-row">
+                    <div>
+                      <h2>Welcome back, Admin 👋</h2>
+                      <div className="sub">Manage your studio, bookings, and analytics efficiently</div>
                     </div>
-                    <div className="card-details">
-                      <h3>{card.title}</h3>
-                      <p>
-                        <CountUp end={card.value} duration={2} separator="," />
-                      </p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.96 }}
+                      className="neo-cta"
+                      onClick={() => safeSetActiveForm("events")}
+                    >
+                      + Add New Event
+                    </motion.button>
+                  </div>
+                </motion.section>
 
-              {/* Charts */}
-              <motion.div
-                className="chart-section"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
-              >
-                <div className="chart-header">
-                  <h3>📊 Activity Overview</h3>
-                  <p>Monthly performance and analytics</p>
+                {/* KPI CARDS */}
+                <div className="neo-kpis">
+                  {cards.map((card, i) => (
+                    <motion.div
+                      key={card.title}
+                      className="neo-card"
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: cardsLoaded ? 1 : 0, y: cardsLoaded ? 0 : 16 }}
+                      transition={{ delay: i * 0.08 }}
+                    >
+                      <div className="kpi-top">
+                        <span className="kpi-icon" style={{ color: card.color }}>
+                          {card.icon}
+                        </span>
+                        <span>{card.title}</span>
+                      </div>
+                      <div className="kpi-value">
+                        <CountUp end={card.value} duration={1.6} separator="," />
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
-                <Charts />
-              </motion.div>
-            </>
-          )}
 
-          {/* -------- Main menu forms -------- */}
-          {activeForm === "studio" && <StudioForm onClose={closeForm} />}
-          {activeForm === "equipment" && <EquipmentForm onClose={closeForm} />}
-          {activeForm === "events" && <EventsForm onClose={closeForm} />}
-          {activeForm === "photography" && <PhotographyForm onClose={closeForm} />}
-          {activeForm === "videography" && <VideographyForm onClose={closeForm} />}
-          {activeForm === "sound" && <SoundForm onClose={closeForm} />}
-          {activeForm === "singer" && <SingerForm onClose={closeForm} />}
-          {activeForm === "payment" && <PaymentForm onClose={closeForm} />}
-          {activeForm === "user" && <UserForm onClose={closeForm} />}
+                {/* CHART PANEL */}
+                <motion.div
+                  className="neo-panel"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.7, delay: 0.2 }}
+                >
+                  <div className="panel-head">
+                    <div className="title">
+                      <span style={{ color: "#ffbf4d" }}>▮▮▮</span>
+                      <span>User Activity</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <div className="neo-pill">+32% Growth</div>
+                      <div className="neo-pill">12 Upcoming Events</div>
+                    </div>
+                  </div>
+                  <Charts />
+                </motion.div>
+              </>
+            )}
 
-          {/* -------- Studio submenu -------- */}
-          {activeForm === "addStudio" && <StudioForm onClose={closeForm} viewOnly={false} />}
-          {activeForm === "viewStudio" && <StudioForm onClose={closeForm} viewOnly={true} />}
-
-          {/* -------- Equipment submenu (wired to your screenshot) -------- */}
-          {activeForm === "addEquipment" && <EquipmentForm onClose={closeForm} viewOnly={false} />}
-          {activeForm === "viewEquipment" && <EquipmentForm onClose={closeForm} viewOnly={true} />}
-
-          {/* -------- Events submenu -------- */}
-          {activeForm === "addEvent" && (
-            <EventsForm onClose={closeForm} defaultTab={defaultTabFor("addEvent")} />
-          )}
-          {activeForm === "viewEvent" && (
-            <EventsForm onClose={closeForm} defaultTab={defaultTabFor("viewEvent")} />
-          )}
-
-          {/* -------- Shows submenu -------- */}
-          {activeForm === "addShow" && (
-            <ShowsForm onClose={closeForm} defaultTab={defaultTabFor("addShow")} />
-          )}
-          {activeForm === "viewShow" && (
-            <ShowsForm onClose={closeForm} defaultTab={defaultTabFor("viewShow")} />
-          )}
-        </div>
+            {/* ===== MODULE VIEWS (ALL) ===== */}
+            {activeForm && <div className="content-wide">{renderActive()}</div>}
+          </div>
+        </section>
       </main>
     </div>
   );
-};
-
-export default Dashboard;
+}
