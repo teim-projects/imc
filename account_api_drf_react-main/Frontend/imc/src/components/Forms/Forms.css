@@ -1143,3 +1143,107 @@ thead {
 [data-theme="dark"] .styled-table th{
   border-bottom-color: #15223a;
 }
+
+/* =========================================================
+   SOUND SERVICE – "Shows-like" UI block (scoped)
+   Place at END of Forms.css
+========================================================= */
+
+/* Wrapper card */
+.card-surface{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+  box-shadow: var(--shadow);
+}
+
+/* Top toolbar (title + Add/View pills) */
+.card-surface .toolbar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; flex-wrap:wrap; margin-bottom:10px;
+}
+.card-surface .title{ display:flex; align-items:center; gap:10px;
+  font-size:1.6rem; font-weight:700; color:var(--navy);
+}
+.card-surface .title .emoji{ font-size:1.5rem; }
+
+/* Search row */
+.card-surface .search-row{
+  display:flex; gap:12px; align-items:center; margin:12px 0;
+}
+.card-surface .search-input{
+  flex:1; padding:12px 14px; border:1px solid var(--gray-350);
+  border-radius:14px; background:#fff; outline:none; font-size:.95rem;
+}
+
+/* Scoped button family (avoid conflicts with global .btn) */
+.card-surface .btn{
+  border:1px solid rgba(10,44,86,.12);
+  background:#fff; padding:10px 14px; border-radius:14px;
+  box-shadow:0 6px 16px rgba(10,44,86,.06);
+  cursor:pointer; font-weight:600;
+}
+.card-surface .btn:hover{ box-shadow:0 10px 22px rgba(10,44,86,.12); }
+.card-surface .btn-primary{ background: var(--gold); border-color: transparent; color: var(--navy); }
+.card-surface .btn-accent{ background:#ffecc0; border-color:transparent; color: var(--navy); }
+.card-surface .btn-soft{ background:#fff7ed; }
+.card-surface .btn-danger{ background:#fde2e1; border-color:#f8b4b2; }
+
+/* Table card */
+.table-card{
+  border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#fff;
+}
+.nice-table{ width:100%; border-collapse:collapse; }
+.nice-table thead th{
+  background:#f8fbff; color:var(--navy); font-weight:700; text-align:left;
+  padding:14px; letter-spacing:.02em;
+}
+.nice-table tbody td{
+  padding:14px; border-top:1px solid #eef2f8; color:#243b55;
+}
+.row-actions{ display:flex; gap:8px; }
+
+/* Pager like "Page 1 / N" */
+.pager{
+  display:flex; gap:12px; align-items:center; justify-content:flex-end; padding:12px;
+}
+
+/* Grid utilities used by the Sound component */
+.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+
+/* Messages under the form */
+.form-msg.ok{ color:#127c39; font-weight:600; }
+.form-msg.err{ color:#b42318; font-weight:600; }
+
+/* Responsive tweaks */
+@media (max-width: 860px){
+  .grid-2{ grid-template-columns:1fr; }
+  .grid-3{ grid-template-columns:1fr; }
+}
+
+/* Dark mode for this block */
+[data-theme="dark"] .card-surface{
+  background: linear-gradient(180deg, #0b1220, #0d1628);
+  border-color: rgba(255,210,63,.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+}
+[data-theme="dark"] .card-surface .title{ color: var(--navy); }
+[data-theme="dark"] .card-surface .search-input{
+  background: var(--gray-100); border-color: var(--gray-300); color: var(--text);
+}
+[data-theme="dark"] .table-card{
+  background:#0b1220; border-color: var(--gray-200);
+}
+[data-theme="dark"] .nice-table thead th{
+  background:#0e1628; color:#dbe7ff;
+}
+[data-theme="dark"] .nice-table tbody td{
+  border-top-color:#15223a; color: var(--text);
+}
+[data-theme="dark"] .card-surface .btn{
+  background: var(--gray-100); border-color: var(--gray-300); color: var(--text);
+}
+[data-theme="dark"] .card-surface .btn-primary{ background: var(--gold); color:#0a2c56; }
+[data-theme="dark"] .card-surface .btn-accent{ background:#5a4b1a; color:#ffe9a6; }

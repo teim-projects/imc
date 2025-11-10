@@ -21,7 +21,7 @@ from dj_rest_auth.serializers import LoginSerializer, UserDetailsSerializer
 from .models import (
     Studio, Event, Show, Payment, Videography, CustomUser,
     Equipment, EquipmentRental, EquipmentEntry, PrivateBooking,
-    PhotographyBooking
+    PhotographyBooking, Sound,   # <-- use Sound (not SoundSetup)
 )
 
 # ---------------------------------------------------------------------
@@ -58,6 +58,7 @@ def _ensure_hms(t: str) -> str:
     if re.fullmatch(r"\d{2}:\d{2}", s):
         return f"{s}:00"
     return s
+
 
 # ---------------------------------------------------------------------
 # Studio
@@ -118,8 +119,10 @@ class StudioSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
+        # expects `payment_list` property on model (already present)
         rep["payment_methods"] = instance.payment_list
         return rep
+
 
 # ---------------------------------------------------------------------
 # Private Booking
@@ -159,24 +162,9 @@ class PrivateBookingSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
 
-
 # ---------------------------------------------------------------------
 # Photography: Booking (OLD field names to match your DB)
 # ---------------------------------------------------------------------
-from decimal import Decimal
-import re
-from rest_framework import serializers
-from .models import PhotographyBooking
-
-PHONE_RE = re.compile(r'^[0-9+\-\s()]{7,20}$')
-
-def _ensure_hms(s: str) -> str:
-    parts = str(s).split(':')
-    parts = [p.zfill(2) for p in parts]
-    while len(parts) < 3:
-        parts.append('00')
-    return ':'.join(parts[:3])
-
 class PhotographyBookingSerializer(serializers.ModelSerializer):
     # UI aliases and single-select payment
     payment_methods_list = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
@@ -204,18 +192,13 @@ class PhotographyBookingSerializer(serializers.ModelSerializer):
         return super().to_internal_value(m)
 
     def validate_contact_number(self, v):
-        if not v:
-            return v
-        if not PHONE_RE.match(v):
-            raise serializers.ValidationError("Enter a valid phone number.")
-        return v
+        return _validate_phone(v)
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         csv = (instance.payment_methods or "").strip()
         rep["payment_methods_list"] = [s.strip() for s in csv.split(",") if s.strip()]
         return rep
-
 
 
 # ---------------------------------------------------------------------
@@ -250,6 +233,7 @@ class ShowSerializer(_BaseEventShowSerializer):
         fields = "__all__"
         read_only_fields = ("created_at", "updated_at")
 
+
 # ---------------------------------------------------------------------
 # Payment
 # ---------------------------------------------------------------------
@@ -273,15 +257,10 @@ class PaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Amount must be greater than 0.")
         return Decimal(value)
 
+
 # ---------------------------------------------------------------------
 # Videography
 # ---------------------------------------------------------------------
-# api/serializers.py
-# api/serializers.py
-from decimal import Decimal, InvalidOperation
-from rest_framework import serializers
-from .models import Videography
-
 class VideographySerializer(serializers.ModelSerializer):
     duration_hours = serializers.DecimalField(
         max_digits=5, decimal_places=2, required=False
@@ -331,7 +310,6 @@ class VideographySerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({key: "This field is required."})
 
         return attrs
-
 
 
 # =====================================================================
@@ -433,8 +411,9 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
         rep['full_name'] = f"{(instance.first_name or '').strip()} {(instance.last_name or '').strip()}".strip()
         return rep
 
+
 # ---------------------------------------------------------------------
-# Password Reset (request & confirm)  — required by your views.py
+# Password Reset (request & confirm)
 # ---------------------------------------------------------------------
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -492,6 +471,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         return {"detail": "Password has been reset successfully."}
 
+
 # ---------------------------------------------------------------------
 # Equipment Entry (flat UI model used by your React form)
 # ---------------------------------------------------------------------
@@ -533,6 +513,7 @@ class EquipmentEntrySerializer(serializers.ModelSerializer):
             rep["photo"] = request.build_absolute_uri(rep["photo"])
         return rep
 
+
 # ---------------------------------------------------------------------
 # Equipment Master / Rentals
 # ---------------------------------------------------------------------
@@ -550,7 +531,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+    read_only_fields = ["created_at", "updated_at"]
 
     def validate_quantity_in_stock(self, value):
         if value is not None and value < 0:
@@ -561,6 +542,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
         if value is not None and value < 0:
             raise serializers.ValidationError("Rate per day must be positive.")
         return value
+
 
 class EquipmentRentalSerializer(serializers.ModelSerializer):
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
@@ -597,3 +579,88 @@ class EquipmentRentalSerializer(serializers.ModelSerializer):
         if return_date and rental_date and return_date < rental_date:
             raise serializers.ValidationError("Return date cannot be before rental date.")
         return attrs
+
+
+# ---------------------------------------------------------------------
+# Sound System (Service) – matches Sound model
+# ---------------------------------------------------------------------
+# api/serializers.py
+from decimal import Decimal
+from rest_framework import serializers
+from .models import Sound
+import re
+
+class SoundSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sound
+        fields = "__all__"
+        read_only_fields = ("created_at",)
+        extra_kwargs = {
+            "email": {"required": False, "allow_null": True, "allow_blank": True},
+            "mobile_no": {"required": False, "allow_null": True, "allow_blank": True},
+            "location": {"required": False, "allow_null": True, "allow_blank": True},
+            "system_type": {"required": False, "allow_null": True, "allow_blank": True},
+            "mixer_model": {"required": False, "allow_null": True, "allow_blank": True},
+            "notes": {"required": False, "allow_null": True, "allow_blank": True},
+            "event_date": {"required": False, "allow_null": True},
+            "payment_method": {"required": False},  # model default is "Cash"
+        }
+
+    def _blank_to_none(self, v):
+        return None if (isinstance(v, str) and v.strip() == "") else v
+
+    def _to_int_or_zero(self, v):
+        if v in (None, "", "null"):
+            return 0
+        try:
+            return int(v)
+        except Exception:
+            return 0  # TEMP: coerce invalid to 0
+
+    def _to_decimal_or_zero(self, v):
+        if v in (None, "", "null"):
+            return Decimal("0")
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return Decimal("0")  # TEMP: coerce invalid to 0
+
+    def to_internal_value(self, data):
+        d = data.copy()
+
+        # Map legacy SoundSetup keys if they appear
+        if "setup_date" in d and "event_date" not in d:
+            d["event_date"] = d.get("setup_date")
+        if "equipment" in d and "system_type" not in d:
+            d["system_type"] = d.get("equipment")
+        if "technician" in d and "notes" not in d:
+            tech = str(d.get("technician") or "").strip()
+            d["notes"] = f"Technician: {tech}" if tech else d.get("notes")
+
+        # Normalize empties
+        for k in ["email", "mobile_no", "location", "system_type", "mixer_model", "notes"]:
+            d[k] = self._blank_to_none(d.get(k))
+        d["event_date"] = self._blank_to_none(d.get("event_date"))
+
+        # Numbers
+        d["speakers_count"] = self._to_int_or_zero(d.get("speakers_count"))
+        d["microphones_count"] = self._to_int_or_zero(d.get("microphones_count"))
+        d["price"] = self._to_decimal_or_zero(d.get("price"))
+
+        # Payment choice
+        pm = (d.get("payment_method") or "").strip().lower()
+        d["payment_method"] = {"upi": "UPI", "card": "Card", "cash": "Cash"}.get(pm, "Cash")
+
+        # Client name default
+        if not (d.get("client_name") or "").strip():
+            d["client_name"] = "Unnamed"
+
+        return super().to_internal_value(d)
+
+    # Keep validation extremely permissive for now
+    def validate_mobile_no(self, v):
+        if v in (None, ""):
+            return v
+        if not re.fullmatch(r"\+?\d{7,15}", str(v).strip()):
+            return ""  # TEMP: drop invalid mobile instead of erroring
+        return v

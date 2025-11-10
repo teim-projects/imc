@@ -24,7 +24,7 @@ import {
  * Props:
  *  - openModal(modalKey: string|null)
  *  - openSubModal(actionKey: string)   e.g. "addStudio", "viewStudio"
- *  - currentKey?: string|null          (optional; from Dashboard to keep active/expanded state in sync)
+ *  - currentKey?: string|null
  */
 function Sidebar({ openModal, openSubModal, currentKey = null }) {
   const [activeName, setActiveName] = useState("Overview");
@@ -52,8 +52,8 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
       viewPhotography: "photography",
       addVideography: "videography",
       viewVideography: "videography",
-      addSound: "sound",
-      viewSound: "sound",
+      // NOTE: sound uses a single full-page module (no add/view sub-keys)
+      // so we intentionally do NOT include addSound/viewSound here.
       addSinger: "singer",
       viewSinger: "singer",
       addPayment: "payment",
@@ -79,7 +79,7 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         icon: <FaMusic />,
         submenu: [
           { label: "➕ Add Info", actionKey: "addStudio" },
-          
+          // you can add { label: "👁 View Info", actionKey: "viewStudio" } if needed
         ],
       },
       {
@@ -88,7 +88,7 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         icon: <FaTools />,
         submenu: [
           { label: "➕ Add Info", actionKey: "addEquipment" },
-        
+          // { label: "👁 View Info", actionKey: "viewEquipment" },
         ],
       },
       {
@@ -98,7 +98,8 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         submenu: [
           { label: "➕ Event", actionKey: "addEvent" },
           { label: "🎤 Show", actionKey: "addShow" },
-         
+          // { label: "👁 View Events", actionKey: "viewEvent" },
+          // { label: "👁 View Shows", actionKey: "viewShow" },
         ],
       },
       {
@@ -107,7 +108,7 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         icon: <FaLock />,
         submenu: [
           { label: "➕ Add Info", actionKey: "addPrivate" },
-   
+          // { label: "👁 View Info", actionKey: "viewPrivate" },
         ],
       },
       {
@@ -116,7 +117,7 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         icon: <FaCamera />,
         submenu: [
           { label: "➕ Add Info", actionKey: "addPhotography" },
-         
+          // { label: "👁 View Info", actionKey: "viewPhotography" },
         ],
       },
       {
@@ -132,10 +133,9 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         name: "Sound Systems",
         key: "sound",
         icon: <FaVolumeUp />,
-        submenu: [
-          { label: "➕ Add Info", actionKey: "addSound" },
-          { label: "👁 View Info", actionKey: "viewSound" },
-        ],
+        // 👉 Single full-page module (no submenu). Clicking opens `activeForm = "sound"`.
+        modal: "sound",
+        submenu: null,
       },
       {
         name: "Singer Management",
@@ -208,7 +208,12 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
       _openModal(null);
     } else {
       setExpandedItem(null);
-      item.modal ? _openModal(item.modal) : _openModal(null);
+      // If a direct modal key is defined, open it (e.g., "sound")
+      if (item.modal !== undefined) {
+        _openModal(item.modal);
+      } else {
+        _openModal(null);
+      }
     }
     setMobileOpen(false);
   };
@@ -276,7 +281,8 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
             const expanded = hasSub ? isItemExpanded(item) : false;
             const isActive =
               activeName === item.name ||
-              (currentKey && subKeyToParent[currentKey] === item.key);
+              (currentKey && subKeyToParent[currentKey] === item.key) ||
+              (item.modal && currentKey === item.modal); // highlight for direct modal pages like "sound"
 
             return (
               <li key={item.key} className={isActive ? "active" : ""}>

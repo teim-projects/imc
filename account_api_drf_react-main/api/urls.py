@@ -4,9 +4,9 @@ from .views import (
   StudioViewSet, EventViewSet, ShowViewSet, PaymentViewSet,
   VideographyViewSet, EquipmentViewSet, EquipmentRentalViewSet,
   EquipmentEntryViewSet, PrivateBookingViewSet, PhotographyBookingViewSet,
-  GoogleLogin, PasswordResetRequestView, PasswordResetConfirmView
+  GoogleLogin, PasswordResetRequestView, PasswordResetConfirmView, 
 )
-
+from .views import SoundViewSet
 router = DefaultRouter()
 router.register(r"studios", StudioViewSet, basename="studios")
 router.register(r"events", EventViewSet, basename="events")
@@ -22,6 +22,7 @@ router.register(r"photography-bookings", PhotographyBookingViewSet, basename="ph
 router.register(r"equipment-master", EquipmentViewSet, basename="equipment-master")
 router.register(r"equipment-rentals", EquipmentRentalViewSet, basename="equipment-rentals")
 router.register(r"equipment", EquipmentEntryViewSet, basename="equipment")
+router.register(r"sound", SoundViewSet, basename="sound") 
 
 urlpatterns = [
     path("", include(router.urls)),

@@ -3,7 +3,7 @@ import axios from "axios";
 import "./Forms.css";
 
 const BASE = import.meta.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const API_PATH = `${BASE}/api/auth/private-bookings/`;
+const API_PATH = `${BASE}/auth/private-bookings/`;
 
 // axios client with JWT (access) from localStorage
 const axiosClient = axios.create({

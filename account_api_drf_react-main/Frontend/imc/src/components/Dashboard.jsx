@@ -9,7 +9,8 @@ import EventsForm from "./Forms/EventsForm";
 import ShowsForm from "./Forms/ShowsForm";
 import PhotographyForm from "./Forms/PhotographyForm";
 import VideographyForm from "./Forms/VideographyForm";
-import SoundForm from "./Forms/SoundForm";
+// ⬇️ replaced old SoundForm with the new full page (ADD/VIEW)
+import SoundSystemService from "./Forms/SoundSystemService";
 import SingerForm from "./Forms/SingerForm";
 import PaymentForm from "./Forms/PaymentForm";
 import UserForm from "./Forms/UserForm";
@@ -43,7 +44,7 @@ const prettyTitle = (k) => {
     events: "Events",
     photography: "Photography",
     videography: "Videography",
-    sound: "Sound",
+    sound: "Sound System Service", // updated label
     singer: "Singer",
     payment: "Payment",
     user: "Users",
@@ -98,9 +99,9 @@ export default function Dashboard() {
   // Demo KPI data
   const cards = useMemo(
     () => [
-      { icon: <FaUsers />,       title: "Customers",   value: 1750, color: "#9ec4ff" },
-      { icon: <FaMicrophone />,  title: "Bookings",    value: 320,  color: "#9ec4ff" },
-      { icon: <FaCalendarAlt />, title: "Events",      value: 58,   color: "#9ec4ff" },
+      { icon: <FaUsers />,       title: "Customers",   value: 1750,  color: "#9ec4ff" },
+      { icon: <FaMicrophone />,  title: "Bookings",    value: 320,   color: "#9ec4ff" },
+      { icon: <FaCalendarAlt />, title: "Events",      value: 58,    color: "#9ec4ff" },
       { icon: <FaDollarSign />,  title: "Revenue (₹)", value: 46800, color: "#ffbf4d" },
     ],
     []
@@ -114,7 +115,7 @@ export default function Dashboard() {
       case "events":          return <EventsForm onClose={closeForm} />;
       case "photography":     return <PhotographyForm onClose={closeForm} />;
       case "videography":     return <VideographyForm onClose={closeForm} />;
-      case "sound":           return <SoundForm onClose={closeForm} />;
+      case "sound":           return <SoundSystemService />; // no onClose; it has its own ADD/VIEW
       case "singer":          return <SingerForm onClose={closeForm} />;
       case "payment":         return <PaymentForm onClose={closeForm} />;
       case "user":            return <UserForm onClose={closeForm} />;

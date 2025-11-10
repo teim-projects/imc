@@ -1,3 +1,4 @@
+# api/views.py
 from datetime import timedelta
 import os
 
@@ -36,8 +37,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
     Studio, PrivateBooking, Event, Show, Payment, Videography,
-    Equipment, EquipmentRental, EquipmentEntry,
-    PhotographyBooking
+    Equipment, EquipmentRental, EquipmentEntry, PhotographyBooking,
+    Sound,   # <-- use Sound model
 )
 
 from .serializers import (
@@ -45,7 +46,7 @@ from .serializers import (
     EventSerializer, ShowSerializer, PaymentSerializer, VideographySerializer,
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
     EquipmentSerializer, EquipmentRentalSerializer, EquipmentEntrySerializer,
-    PhotographyBookingSerializer,
+    PhotographyBookingSerializer, SoundSerializer,  # <-- use SoundSerializer
 )
 
 User = get_user_model()
@@ -66,7 +67,7 @@ class DefaultPagination(PageNumberPagination):
 class GoogleLogin(SocialLoginView):
     if _GOOGLE_OK:
         adapter_class = GoogleOAuth2Adapter  # type: ignore
-        client_class = OAuth2Client  # type: ignore
+        client_class = OAuth2Client          # type: ignore
     callback_url = os.getenv("GOOGLE_CALLBACK_URL")
 
     def post(self, request, *args, **kwargs):
@@ -129,6 +130,7 @@ class PasswordResetRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response({"detail": "Password reset email sent."}, status=status.HTTP_200_OK)
+
 
 class PasswordResetConfirmView(APIView):
     permission_classes = []
@@ -278,15 +280,6 @@ class ShowViewSet(viewsets.ModelViewSet):
 # ====================================================================
 # Photography (OLD NAMES)
 # ====================================================================
-from datetime import timedelta
-from django.utils.timezone import now
-from rest_framework import viewsets, permissions, parsers, filters, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-
-from .models import PhotographyBooking
-from .serializers import PhotographyBookingSerializer
-
 class PhotographyBookingViewSet(viewsets.ModelViewSet):
     queryset = PhotographyBooking.objects.all().order_by("-date", "-created_at")
     serializer_class = PhotographyBookingSerializer
@@ -328,11 +321,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
 # ====================================================================
 # Videography
 # ====================================================================
-# api/views.py
-from rest_framework import viewsets, permissions, filters
-from .models import Videography
-from .serializers import VideographySerializer
-
 class VideographyViewSet(viewsets.ModelViewSet):
     """
     /api/auth/videography/
@@ -341,10 +329,7 @@ class VideographyViewSet(viewsets.ModelViewSet):
     serializer_class = VideographySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-    # search + ordering
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-
-    # search across common text fields
     search_fields = [
         "client_name",
         "project",
@@ -356,8 +341,6 @@ class VideographyViewSet(viewsets.ModelViewSet):
         "payment_method",
         "notes",
     ]
-
-    # allow UI to sort by these columns
     ordering_fields = [
         "created_at",
         "updated_at",
@@ -369,10 +352,7 @@ class VideographyViewSet(viewsets.ModelViewSet):
         "package_type",
         "payment_method",
     ]
-
-    # default table order
     ordering = ["-created_at"]
-
 
 
 # ====================================================================
@@ -472,3 +452,27 @@ class EquipmentEntryViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "category", "brand", "status", "rented_by"]
     ordering_fields = ["created_at", "price_per_day", "name"]
     ordering = ["-created_at"]
+
+
+# ====================================================================
+# Sound System (Service)  — NEW
+# ====================================================================
+# api/views.py
+from rest_framework import parsers
+
+class SoundViewSet(viewsets.ModelViewSet):
+    queryset = Sound.objects.all().order_by("-event_date", "-created_at")
+    serializer_class = SoundSerializer
+    pagination_class = DefaultPagination
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    parser_classes = [parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser]  # ✅ add this
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "client_name", "email", "mobile_no",
+        "system_type", "location", "mixer_model", "notes"
+    ]
+    ordering_fields = [
+        "event_date", "created_at", "price",
+        "speakers_count", "microphones_count", "system_type"
+    ]
+    ordering = ["-event_date", "-created_at"]

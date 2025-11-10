@@ -5,7 +5,7 @@ import "./Forms.css";
 import Toast from "../Toast"; // <-- add this (from the toast component I shared)
 
 const BASE = import.meta?.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const API_URL = `${BASE}/api/auth/videography/`;
+const API_URL = `${BASE}/auth/videography/`;
 
 // Axios client that injects JWT if present
 const api = axios.create();

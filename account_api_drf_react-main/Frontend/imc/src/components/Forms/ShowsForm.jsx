@@ -3,7 +3,7 @@ import axios from "axios";
 import "./Forms.css";
 
 const BASE = import.meta?.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const API_URL = `${BASE}/api/auth/shows/`;
+const API_URL = `${BASE}/auth/shows/`;
 
 // axios client with optional JWT header
 const api = axios.create();

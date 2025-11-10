@@ -1,11 +1,24 @@
+# api/models.py
 from decimal import Decimal
 
-from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
-from django.core.validators import MinValueValidator
-from django.utils import timezone
 from django.conf import settings
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
+from django.db import models
+from django.utils import timezone
+
+
+# ============================================================
+# ===============  UTIL / LEGACY MIGRATION HOOK  =============
+# ============================================================
+
+def upload_image_to(instance, filename):
+    """
+    Legacy helper retained so older migrations that reference
+    api.models.upload_image_to continue to work.
+    """
+    return f"uploads/{filename}"
 
 
 # ============================================================
@@ -22,7 +35,10 @@ class CustomUserManager(BaseUserManager):
             extra_fields["email"] = email
 
         user = self.model(mobile_no=mobile_no, **extra_fields)
-        user.set_password(password)
+        if password:
+            user.set_password(password)
+        else:
+            user.set_unusable_password()
         user.save(using=self._db)
         return user
 
@@ -31,6 +47,10 @@ class CustomUserManager(BaseUserManager):
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
         extra_fields.setdefault("role", "admin")
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
         return self.create_user(email, mobile_no, password, **extra_fields)
 
 
@@ -84,7 +104,7 @@ class Studio(models.Model):
         help_text="Duration in hours",
     )
 
-    # Payment Options (CSV; API exposes list)
+    # Payment Options (CSV; API can expose list)
     payment_methods = models.CharField(
         max_length=255,
         blank=True,
@@ -106,10 +126,10 @@ class Studio(models.Model):
                 name="uniq_studio_date_timeslot",
             ),
         ]
-        indexes = [
-            models.Index(fields=["date", "time_slot"]),
-            models.Index(fields=["studio_name"]),
-        ]
+    indexes = [
+        models.Index(fields=["date", "time_slot"]),
+        models.Index(fields=["studio_name"]),
+    ]
 
     def __str__(self):
         return f"{self.studio_name} | {self.customer} | {self.date}"
@@ -172,13 +192,6 @@ class PrivateBooking(models.Model):
 # ============================================================
 # ===================== PHOTOGRAPHY (OLD NAMES) ==============
 # ============================================================
-from django.db import models
-from django.core.validators import MinValueValidator
-from decimal import Decimal
-
-# Stub to satisfy any old migrations that referenced it
-def upload_image_to(instance, filename):
-    return f"uploads/{filename}"
 
 class PhotographyBooking(models.Model):
     client = models.CharField(max_length=160)
@@ -311,9 +324,6 @@ class Payment(models.Model):
 # ===================== VIDEOGRAPHY MODEL ====================
 # ============================================================
 
-# api/models.py
-from django.db import models
-
 class Videography(models.Model):
     PAYMENT_CHOICES = [
         ("Cash", "Cash"),
@@ -337,8 +347,8 @@ class Videography(models.Model):
     shoot_date    = models.DateField()
     start_time    = models.TimeField(null=True, blank=True)
 
-    # HOURS (fix): make it non-null with a safe default
-    duration_hours = models.DecimalField(max_digits=5, decimal_places=2, default=1.0)
+    # HOURS (non-null with default)
+    duration_hours = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("1.00"))
 
     # Extra
     location      = models.CharField(max_length=150, blank=True)
@@ -369,7 +379,6 @@ class Equipment(models.Model):
     name = models.CharField(max_length=150, unique=True)
     sku = models.CharField(max_length=100, blank=True, null=True, unique=True)
     description = models.TextField(blank=True, null=True)
-    # PositiveIntegerField is naturally >= 0; no explicit MinValueValidator needed
     quantity_in_stock = models.PositiveIntegerField(default=0)
     rate_per_day = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal("0.00"),
@@ -409,7 +418,7 @@ class EquipmentRental(models.Model):
     customer_contact = models.CharField(max_length=20, blank=True, null=True)
     rental_date = models.DateField()
     return_date = models.DateField(blank=True, null=True)
-    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])  # needs at least 1
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])  # at least 1
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="booked")
 
     # Optional links
@@ -431,7 +440,7 @@ class EquipmentRental(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)  # ensure updated_at works
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -509,7 +518,7 @@ class EquipmentEntry(models.Model):
 
     # Meta
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)   # <- fixed
+    updated_at = models.DateTimeField(auto_now_add=False, auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -522,3 +531,44 @@ class EquipmentEntry(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# ===============================================
+# ============  SOUND SYSTEM (SERVICE)  =========
+# ===============================================
+
+class Sound(models.Model):
+    PAYMENT_CHOICES = [
+        ("Cash", "Cash"),
+        ("Card", "Card"),
+        ("UPI", "UPI"),
+    ]
+    client_name = models.CharField(max_length=120)
+    email = models.EmailField(blank=True, null=True)
+    mobile_no = models.CharField(max_length=20, blank=True, null=True)
+    event_date = models.DateField(blank=True, null=True)
+    location = models.CharField(max_length=200, blank=True, null=True)
+
+    system_type = models.CharField(max_length=120, blank=True, null=True)   # e.g., PA, DJ, Live
+    speakers_count = models.PositiveIntegerField(default=0)
+    microphones_count = models.PositiveIntegerField(default=0)
+    mixer_model = models.CharField(max_length=120, blank=True, null=True)
+
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default="Cash")
+    notes = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.client_name} - {self.system_type or 'Sound'}"
+
+
+# ------------------------------------------------------------
+# Temporary alias so legacy imports like `from api.models import SoundSetup`
+# don't crash while you update admin/serializers/views. Remove later.
+# ------------------------------------------------------------
+SoundSetup = Sound
