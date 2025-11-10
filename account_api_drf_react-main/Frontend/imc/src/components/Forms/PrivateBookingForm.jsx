@@ -1,8 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getAxios } from "../api/axiosInstance";
+import axios from "axios";
 import "./Forms.css";
 
-const API_PATH = "http://127.0.0.1:8000/api/auth/private-bookings/";
+const BASE = import.meta.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
+const API_PATH = `${BASE}/auth/private-bookings/`;
+
+// axios client with JWT (access) from localStorage
+const axiosClient = axios.create({
+  baseURL: BASE,
+  headers: { "Content-Type": "application/json" },
+});
+axiosClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
   // ---------- UI State ----------
@@ -40,14 +52,17 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
   const [formData, setFormData] = useState(emptyForm);
 
   // ---------- Helpers ----------
-  const axios = getAxios();
-
-  const formatErr = (err) => {
-    if (err?.response?.data) {
+  const humanizeErr = (err) => {
+    const data = err?.response?.data;
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      const key = Object.keys(data)[0];
+      const val = data[key];
+      if (Array.isArray(val)) return `${key}: ${val[0]}`;
+      if (typeof val === "string") return `${key}: ${val}`;
       try {
-        return JSON.stringify(err.response.data, null, 2);
-      } catch (_) {
-        return String(err.response.data);
+        return JSON.stringify(data, null, 2);
+      } catch {
+        return String(data);
       }
     }
     return err?.message || "Unknown error";
@@ -68,10 +83,14 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
     setLoading(true);
     clearStatus();
     try {
-      const { data } = await axios.get(API_PATH);
-      setRows(Array.isArray(data) ? data : []);
+      const { data } = await axiosClient.get(API_PATH);
+      const list = Array.isArray(data) ? data : data?.results ?? data ?? [];
+      const safeList = Array.isArray(list) ? list : [];
+      setRows(safeList);
+      const totalPagesAfter = Math.max(1, Math.ceil((safeList.length || 0) / pageSize));
+      if (page > totalPagesAfter) setPage(totalPagesAfter);
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     } finally {
       setLoading(false);
     }
@@ -139,13 +158,11 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
       venue: row.venue || "",
       date: row.date || "",
       time_slot: row.time_slot || "",
-      duration: row.duration || "",
+      duration: row.duration ?? "",
       guest_count:
         row.guest_count === 0 || row.guest_count ? Number(row.guest_count) : "",
       notes: row.notes || "",
-      payment_methods: Array.isArray(row.payment_methods)
-        ? row.payment_methods
-        : [],
+      payment_methods: Array.isArray(row.payment_methods) ? row.payment_methods : [],
     });
     clearStatus();
   };
@@ -154,11 +171,14 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
     if (!window.confirm("Delete this booking?")) return;
     clearStatus();
     try {
-      await axios.delete(`${API_PATH}${id}/`);
+      await axiosClient.delete(`${API_PATH}${id}/`);
+      const after = rows.length - 1;
+      const pages = Math.max(1, Math.ceil(after / pageSize));
+      if (page > pages) setPage(pages);
       setRows((prev) => prev.filter((x) => x.id !== id));
       toast("🗑️ Deleted");
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     }
   };
 
@@ -174,6 +194,8 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
     if (!formData.date?.trim()) return "Date is required.";
     const d = Number(formData.duration);
     if (Number.isNaN(d) || d <= 0) return "Duration must be greater than 0.";
+    if (formData.guest_count !== "" && Number(formData.guest_count) < 1)
+      return "Guest count must be at least 1.";
     return null;
   };
 
@@ -187,8 +209,8 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
     const payload = {
       ...formData,
       duration: Number(formData.duration),
-      guest_count:
-        formData.guest_count === "" ? null : Number(formData.guest_count),
+      time_slot: formData.time_slot ? formData.time_slot : null, // DRF prefers null over ""
+      guest_count: formData.guest_count === "" ? null : Number(formData.guest_count),
       payment_methods: Array.isArray(formData.payment_methods)
         ? formData.payment_methods
         : [],
@@ -197,17 +219,17 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
     setSaving(true);
     try {
       if (editingId) {
-        await axios.put(`${API_PATH}${editingId}/`, payload);
+        await axiosClient.put(`${API_PATH}${editingId}/`, payload);
         toast("✅ Booking updated");
       } else {
-        await axios.post(API_PATH, payload);
+        await axiosClient.post(API_PATH, payload);
         toast("✅ Booking added");
       }
       await fetchRows();
       resetForm();
       setTab("VIEW");
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     } finally {
       setSaving(false);
     }
@@ -222,19 +244,23 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
           <button
             className={tab === "ADD" ? "tab active" : "tab"}
             onClick={() => setTab("ADD")}
+            type="button"
           >
             Add Booking
           </button>
           <button
             className={tab === "VIEW" ? "tab active" : "tab"}
             onClick={() => setTab("VIEW")}
+            type="button"
           >
             View Bookings
           </button>
         </div>
-        <button className="close-x" onClick={onClose} aria-label="Close">
-          ✖
-        </button>
+        {onClose && (
+          <button className="close-x" onClick={onClose} aria-label="Close">
+            ✖
+          </button>
+        )}
       </div>
 
       {successMsg && <div className="banner success">{successMsg}</div>}
@@ -386,13 +412,7 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
 
           <div className="actions full">
             <button type="submit" className="primary" disabled={saving}>
-              {saving
-                ? editingId
-                  ? "Updating..."
-                  : "Saving..."
-                : editingId
-                ? "Update"
-                : "Save"}
+              {saving ? (editingId ? "Updating..." : "Saving...") : editingId ? "Update" : "Save"}
             </button>
             <button type="button" className="ghost" onClick={resetForm} disabled={saving}>
               Reset
@@ -457,17 +477,21 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
                         <td>{b.date || "-"}</td>
                         <td>{b.time_slot || "-"}</td>
                         <td>{b.duration || "-"}</td>
-                        <td>
-                          {b.guest_count === 0 || b.guest_count ? b.guest_count : "-"}
-                        </td>
+                        <td>{b.guest_count === 0 || b.guest_count ? b.guest_count : "-"}</td>
                         <td>
                           {Array.isArray(b.payment_methods) && b.payment_methods.length
                             ? b.payment_methods.join(", ")
                             : "-"}
                         </td>
                         <td className="right">
-                          <button className="mini" onClick={() => handleEdit(b)}>✏️ Edit</button>
-                          <button className="mini danger" onClick={() => handleDelete(b.id)}>
+                          <button className="mini" onClick={() => handleEdit(b)} disabled={saving}>
+                            ✏️ Edit
+                          </button>
+                          <button
+                            className="mini danger"
+                            onClick={() => handleDelete(b.id)}
+                            disabled={saving}
+                          >
                             🗑 Delete
                           </button>
                         </td>

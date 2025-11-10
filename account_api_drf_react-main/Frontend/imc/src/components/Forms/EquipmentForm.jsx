@@ -10,7 +10,7 @@ import "./Forms.css";
  *   (If your API uses PATCH, change axios.put -> axios.patch)
  */
 
-const API_URL = "http://127.0.0.1:8000/api/auth/equipment/";
+const API_URL = "http://127.0.0.1:8000/auth/equipment/";
 const PAGE_SIZE = 10;
 
 /* =========================

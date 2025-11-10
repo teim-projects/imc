@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// Sidebar.jsx
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import "./Sidebar.css";
 import {
   FaMusic,
@@ -15,156 +16,214 @@ import {
   FaUsers,
   FaBars,
   FaTimes,
-  FaSignInAlt,
 } from "react-icons/fa";
 
 /**
- * Reusable Sidebar with per-item submenus (Add Info / View Info) for all modules.
- * - Hover to expand/collapse on desktop
- * - Mobile drawer with overlay
- * - A11y-friendly aria-* attributes
+ * Sidebar
  *
- * Parent should provide:
- *   openModal(modalKey?: string | null)
- *   openSubModal(actionKey: string)  // e.g., "addStudio", "viewStudio", etc.
+ * Props:
+ *  - openModal(modalKey: string|null)
+ *  - openSubModal(actionKey: string)   e.g. "addStudio", "viewStudio"
+ *  - currentKey?: string|null
  */
-function Sidebar({ openModal, openSubModal }) {
-  const [active, setActive] = useState("Overview");
+function Sidebar({ openModal, openSubModal, currentKey = null }) {
+  const [activeName, setActiveName] = useState("Overview");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [expandedItem, setExpandedItem] = useState(null); // which item’s submenu is open
+  const [expandedItem, setExpandedItem] = useState(null); // which group's submenu is open
 
-  // fallback handlers
   const _openModal = openModal || (() => {});
   const _openSubModal = openSubModal || (() => {});
 
-  // Define menu + sub-actions
-  const menuItems = [
-    {
-      name: "Overview",
-      key: "overview",
-      icon: <FaChartLine />,
-      modal: null,
-      submenu: null,
-    },
-    {
-      name: "Studio Rentals",
-      key: "studio",
-      icon: <FaMusic />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addStudio" },
-        { label: "👁 View Info", actionKey: "viewStudio" },
-      ],
-    },
-    {
-      name: "Equipment Rentals",
-      key: "equipment",
-      icon: <FaTools />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addEquipment" },
-        // { label: "👁 View Info", actionKey: "viewEquipment" },
-      ],
-    },
-    {
-      name: "Events & Shows",
-      key: "eventsShows",
-      icon: <FaCalendarAlt />,
-      submenu: [
-        { label: "➕ Event", actionKey: "addEvent" },
-        { label: "🎤 Show", actionKey: "addShow" },
-      ],
-    },
-    {
-      name: "Private Bookings",
-      key: "private",
-      icon: <FaLock />,
-    
-    },
-    {
-      name: "Photography",
-      key: "photography",
-      icon: <FaCamera />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addPhotography" },
-        { label: "👁 View Info", actionKey: "viewPhotography" },
-      ],
-    },
-    {
-      name: "Videography",
-      key: "videography",
-      icon: <FaVideo />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addVideography" },
-        { label: "👁 View Info", actionKey: "viewVideography" },
-      ],
-    },
-    {
-      name: "Sound Systems",
-      key: "sound",
-      icon: <FaVolumeUp />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addSound" },
-        { label: "👁 View Info", actionKey: "viewSound" },
-      ],
-    },
-    {
-      name: "Singer Management",
-      key: "singer",
-      icon: <FaUser />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addSinger" },
-        { label: "👁 View Info", actionKey: "viewSinger" },
-      ],
-    },
-    {
-      name: "Payments",
-      key: "payment",
-      icon: <FaMoneyBill />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addPayment" },
-        { label: "👁 View Info", actionKey: "viewPayment" },
-      ],
-    },
-    {
-      name: "User Management",
-      key: "user",
-      icon: <FaUsers />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addUser" },
-        { label: "👁 View Info", actionKey: "viewUser" },
-      ],
-    },
-    {
-      name: "Contact",
-      key: "contact",
-      icon: <FaEnvelope />,
-      modal: "contact",
-      submenu: null,
-    },
-  ];
+  // Map of sub-action -> parent key to auto-expand correct group
+  const subKeyToParent = useMemo(
+    () => ({
+      addStudio: "studio",
+      viewStudio: "studio",
+      addEquipment: "equipment",
+      viewEquipment: "equipment",
+      addEvent: "eventsShows",
+      viewEvent: "eventsShows",
+      addShow: "eventsShows",
+      viewShow: "eventsShows",
+      addPrivate: "private",
+      viewPrivate: "private",
+      addPhotography: "photography",
+      viewPhotography: "photography",
+      addVideography: "videography",
+      viewVideography: "videography",
+      // NOTE: sound uses a single full-page module (no add/view sub-keys)
+      // so we intentionally do NOT include addSound/viewSound here.
+      addSinger: "singer",
+      viewSinger: "singer",
+      addPayment: "payment",
+      viewPayment: "payment",
+      addUser: "user",
+      viewUser: "user",
+    }),
+    []
+  );
 
-  const goHome = () => {
-    setActive("Overview");
+  const menuItems = useMemo(
+    () => [
+      {
+        name: "Overview",
+        key: "overview",
+        icon: <FaChartLine />,
+        modal: null,
+        submenu: null,
+      },
+      {
+        name: "Studio Rentals",
+        key: "studio",
+        icon: <FaMusic />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addStudio" },
+          // you can add { label: "👁 View Info", actionKey: "viewStudio" } if needed
+        ],
+      },
+      {
+        name: "Equipment Rentals",
+        key: "equipment",
+        icon: <FaTools />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addEquipment" },
+          // { label: "👁 View Info", actionKey: "viewEquipment" },
+        ],
+      },
+      {
+        name: "Events & Shows",
+        key: "eventsShows",
+        icon: <FaCalendarAlt />,
+        submenu: [
+          { label: "➕ Event", actionKey: "addEvent" },
+          { label: "🎤 Show", actionKey: "addShow" },
+          // { label: "👁 View Events", actionKey: "viewEvent" },
+          // { label: "👁 View Shows", actionKey: "viewShow" },
+        ],
+      },
+      {
+        name: "Private Bookings",
+        key: "private",
+        icon: <FaLock />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addPrivate" },
+          // { label: "👁 View Info", actionKey: "viewPrivate" },
+        ],
+      },
+      {
+        name: "Photography",
+        key: "photography",
+        icon: <FaCamera />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addPhotography" },
+          // { label: "👁 View Info", actionKey: "viewPhotography" },
+        ],
+      },
+      {
+        name: "Videography",
+        key: "videography",
+        icon: <FaVideo />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addVideography" },
+          { label: "👁 View Info", actionKey: "viewVideography" },
+        ],
+      },
+      {
+        name: "Sound Systems",
+        key: "sound",
+        icon: <FaVolumeUp />,
+        // 👉 Single full-page module (no submenu). Clicking opens `activeForm = "sound"`.
+        modal: "sound",
+        submenu: null,
+      },
+      {
+        name: "Singer Management",
+        key: "singer",
+        icon: <FaUser />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addSinger" },
+          { label: "👁 View Info", actionKey: "viewSinger" },
+        ],
+      },
+      {
+        name: "Payments",
+        key: "payment",
+        icon: <FaMoneyBill />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addPayment" },
+          { label: "👁 View Info", actionKey: "viewPayment" },
+        ],
+      },
+      {
+        name: "User Management",
+        key: "user",
+        icon: <FaUsers />,
+        submenu: [
+          { label: "➕ Add Info", actionKey: "addUser" },
+          { label: "👁 View Info", actionKey: "viewUser" },
+        ],
+      },
+      {
+        name: "Contact",
+        key: "contact",
+        icon: <FaEnvelope />,
+        modal: "contact",
+        submenu: null,
+      },
+    ],
+    []
+  );
+
+  const goHome = useCallback(() => {
+    setActiveName("Overview");
     setExpandedItem(null);
     _openModal(null);
     setMobileOpen(false);
-  };
+  }, [_openModal]);
 
   // Disable page scroll when sidebar is open on mobile
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "auto";
   }, [mobileOpen]);
 
+  // Keep expanded group in sync with currentKey (from Dashboard)
+  useEffect(() => {
+    if (!currentKey) return;
+    const parent = subKeyToParent[currentKey];
+    if (parent) setExpandedItem(parent);
+  }, [currentKey, subKeyToParent]);
+
+  const toggleExpand = (key) => {
+    setExpandedItem((curr) => (curr === key ? null : key));
+  };
+
   const handleItemClick = (item) => {
-    setActive(item.name);
-    if (item.submenu && item.submenu.length) {
-      setExpandedItem((curr) => (curr === item.key ? null : item.key));
+    const hasSub = item.submenu && item.submenu.length > 0;
+    setActiveName(item.name);
+
+    if (hasSub) {
+      // toggle its submenu (don’t open main modal when expanding)
+      toggleExpand(item.key);
       _openModal(null);
     } else {
       setExpandedItem(null);
-      item.modal ? _openModal(item.modal) : _openModal(null);
+      // If a direct modal key is defined, open it (e.g., "sound")
+      if (item.modal !== undefined) {
+        _openModal(item.modal);
+      } else {
+        _openModal(null);
+      }
     }
     setMobileOpen(false);
+  };
+
+  const handleItemKey = (e, item) => {
+    // Enter/Space toggles
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleItemClick(item);
+    }
   };
 
   const handleSubClick = (e, actionKey) => {
@@ -174,11 +233,18 @@ function Sidebar({ openModal, openSubModal }) {
     setMobileOpen(false);
   };
 
+  // Helper: active/expanded visual based on currentKey if given
+  const isItemExpanded = (item) =>
+    expandedItem === item.key ||
+    (!!currentKey && subKeyToParent[currentKey] === item.key);
+
   return (
     <>
       {/* ===== MOBILE HEADER ===== */}
       <div className="mobile-header">
-        <h2 className="mobile-title" onClick={goHome}>IMC</h2>
+        <h2 className="mobile-title" onClick={goHome}>
+          IMC
+        </h2>
         <button
           className="mobile-menu-btn"
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -203,7 +269,7 @@ function Sidebar({ openModal, openSubModal }) {
         onMouseLeave={() => setIsHovered(false)}
         aria-label="Main sidebar navigation"
       >
-        {/* ===== HEADER (text only now) ===== */}
+        {/* ===== HEADER ===== */}
         <div className="sidebar-header" onClick={goHome}>
           <h2 className="sidebar-title">IMC</h2>
         </div>
@@ -211,28 +277,32 @@ function Sidebar({ openModal, openSubModal }) {
         {/* ===== MENU ===== */}
         <ul className="sidebar-menu">
           {menuItems.map((item) => {
-            const isActive = active === item.name;
-            const isExpanded = expandedItem === item.key;
-            const hasSub = item.submenu && item.submenu.length;
+            const hasSub = !!(item.submenu && item.submenu.length);
+            const expanded = hasSub ? isItemExpanded(item) : false;
+            const isActive =
+              activeName === item.name ||
+              (currentKey && subKeyToParent[currentKey] === item.key) ||
+              (item.modal && currentKey === item.modal); // highlight for direct modal pages like "sound"
 
             return (
               <li key={item.key} className={isActive ? "active" : ""}>
                 <button
                   className="sidebar-btn"
                   onClick={() => handleItemClick(item)}
-                  aria-expanded={hasSub ? isExpanded : undefined}
+                  onKeyDown={(e) => handleItemKey(e, item)}
+                  aria-expanded={hasSub ? expanded : undefined}
                   aria-controls={hasSub ? `${item.key}-submenu` : undefined}
                 >
                   <div className="icon">{item.icon}</div>
                   <span className="text">{item.name}</span>
                   {hasSub && (
-                    <span className={`caret ${isExpanded ? "open" : ""}`} aria-hidden>
+                    <span className={`caret ${expanded ? "open" : ""}`} aria-hidden>
                       ▾
                     </span>
                   )}
                 </button>
 
-                {hasSub && isExpanded && (
+                {hasSub && expanded && (
                   <div
                     id={`${item.key}-submenu`}
                     className="submenu"
@@ -253,8 +323,6 @@ function Sidebar({ openModal, openSubModal }) {
             );
           })}
         </ul>
-
-        
       </aside>
     </>
   );

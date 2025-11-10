@@ -15,6 +15,10 @@ from .models import (
     Show,
     Payment,
     Videography,
+    # New registrations
+    PrivateBooking,
+    PhotographyBooking,
+    Sound,  # ✅ use Sound (not SoundSetup)
 )
 
 # Try to import equipment-related models; they may or may not exist in this codebase
@@ -64,8 +68,7 @@ def export_as_csv_action(description="Export selected as CSV", fields=None, head
                 if hasattr(modeladmin, field) and callable(getattr(modeladmin, field)):
                     row.append(getattr(modeladmin, field)(obj))
                 else:
-                    value = getattr(obj, field, "")
-                    row.append(value)
+                    row.append(getattr(obj, field, ""))
             writer.writerow(row)
         return response
 
@@ -79,8 +82,16 @@ def export_as_csv_action(description="Export selected as CSV", fields=None, head
 
 @admin.register(Studio)
 class StudioAdmin(admin.ModelAdmin):
-    list_display = ("studio_name", "customer", "date", "time_slot", "duration", "created_at")
-    search_fields = ("studio_name", "customer", "email", "contact_number")
+    list_display = (
+        "studio_name",
+        "customer",
+        "date",
+        "time_slot",
+        "duration",
+        "payment_methods",
+        "created_at",
+    )
+    search_fields = ("studio_name", "customer", "email", "contact_number", "address")
     list_filter = ("studio_name", "date")
     ordering = ("-date", "-time_slot")
     list_per_page = 25
@@ -89,8 +100,8 @@ class StudioAdmin(admin.ModelAdmin):
 
     actions = [
         export_as_csv_action(fields=[
-            "id", "studio_name", "customer", "date", "time_slot",
-            "duration", "payment_methods", "created_at"
+            "id", "studio_name", "customer", "email", "contact_number", "address",
+            "date", "time_slot", "duration", "payment_methods", "created_at"
         ])
     ]
 
@@ -155,19 +166,135 @@ class PaymentAdmin(admin.ModelAdmin):
 # ======================================
 # ========= VIDEOGRAPHY ADMIN ==========
 # ======================================
-
 @admin.register(Videography)
 class VideographyAdmin(admin.ModelAdmin):
-    list_display = ("project", "editor", "duration", "delivery_date", "created_at")
-    search_fields = ("project", "editor")
-    list_filter = ("delivery_date",)
-    ordering = ("-delivery_date",)
+    list_display = (
+        "id",
+        "client_name",
+        "project",
+        "editor",
+        "shoot_date",
+        "start_time",
+        "duration_display",
+        "package_type",
+        "payment_method",
+        "created_at",
+    )
+    search_fields = (
+        "client_name",
+        "email",
+        "mobile_no",
+        "project",
+        "editor",
+        "location",
+        "notes",
+    )
+    list_filter = ("shoot_date", "package_type", "payment_method", "editor")
+    ordering = ("-shoot_date", "-created_at")
     list_per_page = 25
-    date_hierarchy = "delivery_date"
+    date_hierarchy = "shoot_date"
     readonly_fields = ("created_at", "updated_at")
 
     actions = [
-        export_as_csv_action(fields=["id", "project", "editor", "duration", "delivery_date", "created_at"])
+        export_as_csv_action(fields=[
+            "id",
+            "client_name", "email", "mobile_no",
+            "project", "editor",
+            "shoot_date", "start_time", "duration_hours",
+            "location", "package_type", "payment_method",
+            "notes",
+            "created_at",
+        ])
+    ]
+
+    def duration_display(self, obj):
+        if obj.duration_hours is None:
+            return "-"
+        return f"{float(obj.duration_hours):g} hrs"
+    duration_display.short_description = "Duration (hrs)"
+    duration_display.admin_order_field = "duration_hours"
+
+
+# ======================================
+# ======== PRIVATE BOOKING ADMIN =======
+# ======================================
+
+@admin.register(PrivateBooking)
+class PrivateBookingAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "customer", "event_type", "venue",
+        "date", "time_slot", "duration", "guest_count", "created_at",
+    )
+    search_fields = ("customer", "event_type", "venue", "email", "contact_number", "address", "notes")
+    list_filter = ("event_type", "date", "venue")
+    ordering = ("-date", "-time_slot")
+    list_per_page = 30
+    date_hierarchy = "date"
+    readonly_fields = ("created_at", "updated_at")
+
+    actions = [
+        export_as_csv_action(fields=[
+            "id", "customer", "event_type", "venue",
+            "date", "time_slot", "duration", "guest_count",
+            "created_at"
+        ])
+    ]
+
+
+# ==========================================
+# ======== PHOTOGRAPHY BOOKING ADMIN =======
+# ==========================================
+
+@admin.register(PhotographyBooking)
+class PhotographyBookingAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "client", "event_type", "package_type",
+        "date", "start_time", "duration_hours",
+        "location", "photographers_count", "videographers_count",
+        "price", "discount", "tax_percent", "created_at",
+    )
+    search_fields = ("client", "email", "contact_number", "location", "notes", "event_type", "package_type")
+    list_filter = ("event_type", "package_type", "date")
+    ordering = ("-date", "-created_at")
+    list_per_page = 30
+    date_hierarchy = "date"
+    readonly_fields = ("created_at", "updated_at")
+
+    actions = [
+        export_as_csv_action(fields=[
+            "id", "client", "email", "contact_number",
+            "event_type", "package_type",
+            "date", "start_time", "duration_hours",
+            "location", "photographers_count", "videographers_count",
+            "price", "discount", "tax_percent",
+            "payment_methods", "created_at"
+        ])
+    ]
+
+
+# ======================================
+# ========= SOUND ADMIN (NEW) ==========
+# ======================================
+
+@admin.register(Sound)
+class SoundAdmin(admin.ModelAdmin):
+    list_display = (
+        "id", "client_name", "system_type", "event_date",
+        "location", "payment_method", "price", "created_at",
+    )
+    search_fields = ("client_name", "email", "mobile_no", "system_type", "location", "mixer_model", "notes")
+    list_filter = ("event_date", "payment_method", "system_type")
+    ordering = ("-event_date", "-created_at")
+    list_per_page = 30
+    date_hierarchy = "event_date"
+    readonly_fields = ("created_at",)
+
+    actions = [
+        export_as_csv_action(fields=[
+            "id", "client_name", "email", "mobile_no",
+            "system_type", "speakers_count", "microphones_count", "mixer_model",
+            "event_date", "location", "price", "payment_method", "notes", "created_at"
+        ])
     ]
 
 
@@ -187,7 +314,7 @@ else:
     EquipmentRentalInline = None
 
 
-# ---------- Equipment master (optional in your codebase) ----------
+# ---------- Equipment master (optional) ----------
 if Equipment is not None:
     class _EquipmentAdmin(admin.ModelAdmin):
         list_display = ("name", "sku", "quantity_in_stock", "rate_per_day", "is_active", "updated_at")
@@ -208,7 +335,7 @@ if Equipment is not None:
     admin.site.register(Equipment, _EquipmentAdmin)
 
 
-# ---------- Equipment Rental (optional in your codebase) ----------
+# ---------- Equipment Rental (optional) ----------
 if EquipmentRental is not None:
     class _EquipmentRentalAdmin(admin.ModelAdmin):
         list_display = (

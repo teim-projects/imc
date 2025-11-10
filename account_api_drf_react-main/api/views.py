@@ -1,10 +1,9 @@
 # api/views.py
-
 from datetime import timedelta
 import os
 
 from django.contrib.auth import get_user_model
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.utils.timezone import now
 
 from rest_framework import viewsets, filters, status, permissions, parsers
@@ -13,75 +12,81 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-# Google social login (optional)
-from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-from dj_rest_auth.registration.views import SocialLoginView
-from google.oauth2 import id_token  # type: ignore
-from google.auth.transport import requests  # type: ignore
+# Optional Google login imports
+try:
+    from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+    from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+    from dj_rest_auth.registration.views import SocialLoginView
+    _GOOGLE_OK = True
+except Exception:
+    GoogleOAuth2Adapter = None
+    OAuth2Client = None
+    SocialLoginView = APIView
+    _GOOGLE_OK = False
 
-# ---------- Models ----------
-from .models import (
-    Studio, Event, Show, Payment, Videography,
-    Equipment, EquipmentRental, EquipmentEntry,
-)
-
-# ---------- Serializers ----------
-from .serializers import (
-    StudioSerializer,
-    EventSerializer,
-    ShowSerializer,
-    PaymentSerializer,
-    VideographySerializer,
-    PasswordResetRequestSerializer,
-    PasswordResetConfirmSerializer,
-    # Equipment (master + rental + flat UI)
-    EquipmentSerializer,
-    EquipmentRentalSerializer,
-    EquipmentEntrySerializer,
-)
+try:
+    from google.oauth2 import id_token   # type: ignore
+    from google.auth.transport import requests  # type: ignore
+    _GOOGLE_VERIFY_OK = True
+except Exception:
+    id_token = None
+    requests = None
+    _GOOGLE_VERIFY_OK = False
 
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from .models import (
+    Studio, PrivateBooking, Event, Show, Payment, Videography,
+    Equipment, EquipmentRental, EquipmentEntry, PhotographyBooking,
+    Sound,   # <-- use Sound model
+)
+
+from .serializers import (
+    StudioSerializer, PrivateBookingSerializer,
+    EventSerializer, ShowSerializer, PaymentSerializer, VideographySerializer,
+    PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    EquipmentSerializer, EquipmentRentalSerializer, EquipmentEntrySerializer,
+    PhotographyBookingSerializer, SoundSerializer,  # <-- use SoundSerializer
+)
 
 User = get_user_model()
 
 
-# ============================================================================
-#                              Pagination
-# ============================================================================
+# ====================================================================
+# Pagination
+# ====================================================================
 class DefaultPagination(PageNumberPagination):
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 100
 
 
-# ============================================================================
-#                        Google OAuth2 Login (JWT)
-# ============================================================================
+# ====================================================================
+# Google OAuth2 Login → JWT (safe stub)
+# ====================================================================
 class GoogleLogin(SocialLoginView):
-    adapter_class = GoogleOAuth2Adapter
-    client_class = OAuth2Client
+    if _GOOGLE_OK:
+        adapter_class = GoogleOAuth2Adapter  # type: ignore
+        client_class = OAuth2Client          # type: ignore
     callback_url = os.getenv("GOOGLE_CALLBACK_URL")
 
     def post(self, request, *args, **kwargs):
-        """
-        Verify Google token → get/create user → issue JWT tokens.
-        Expected payload: { "access_token": "<google_id_token>" }
-        """
+        if not (_GOOGLE_OK and _GOOGLE_VERIFY_OK):
+            return Response({"error": "Google login not configured on this server."},
+                            status=status.HTTP_501_NOT_IMPLEMENTED)
+
         token = request.data.get("access_token")
         if not token:
             return Response({"error": "Missing access_token"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            idinfo = id_token.verify_oauth2_token(
+            idinfo = id_token.verify_oauth2_token(  # type: ignore
                 token,
-                requests.Request(),
+                requests.Request(),  # type: ignore
                 os.getenv("GOOGLE_CLIENT_ID"),
             )
-
             email = idinfo.get("email")
             name = idinfo.get("name", "")
-            picture = idinfo.get("picture", "")
 
             if not email:
                 return Response({"error": "Google token missing email"}, status=status.HTTP_400_BAD_REQUEST)
@@ -89,22 +94,24 @@ class GoogleLogin(SocialLoginView):
             user, created = User.objects.get_or_create(email=email)
             if created:
                 user.is_active = True
-                if hasattr(user, "first_name") and hasattr(user, "last_name") and name:
-                    parts = name.split()
-                    user.first_name = parts[0]
+                parts = (name or "").split()
+                if hasattr(user, "first_name"):
+                    user.first_name = parts[0] if parts else ""
+                if hasattr(user, "last_name"):
                     user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
-                # If you want to store picture → custom handling needed for ImageField
                 user.save()
 
             refresh = RefreshToken.for_user(user)
-            data = {
-                "access": str(refresh.access_token),
-                "refresh": str(refresh),
-                "email": user.email,
-                "name": name,
-                "message": "Google login successful",
-            }
-            return Response(data, status=status.HTTP_200_OK)
+            return Response(
+                {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "email": user.email,
+                    "name": name,
+                    "message": "Google login successful",
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except ValueError as ve:
             return Response({"error": "Invalid Google token", "details": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
@@ -112,9 +119,9 @@ class GoogleLogin(SocialLoginView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-# ============================================================================
-#                     Password Reset (Request & Confirm)
-# ============================================================================
+# ====================================================================
+# Password Reset
+# ====================================================================
 class PasswordResetRequestView(APIView):
     permission_classes = []
 
@@ -131,13 +138,12 @@ class PasswordResetConfirmView(APIView):
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        # serializer returns {"detail": "..."} on success
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
 
-# ============================================================================
-#                                Studios
-# ============================================================================
+# ====================================================================
+# Studios
+# ====================================================================
 class StudioViewSet(viewsets.ModelViewSet):
     queryset = Studio.objects.all()
     serializer_class = StudioSerializer
@@ -149,7 +155,6 @@ class StudioViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def upcoming(self, request):
-        """GET /api/studios/upcoming/?days=7"""
         try:
             days = int(request.query_params.get("days", 7))
         except ValueError:
@@ -162,10 +167,8 @@ class StudioViewSet(viewsets.ModelViewSet):
         )
         return Response(self.get_serializer(qs, many=True).data)
 
-
     @action(detail=False, methods=["get"])
     def by_date(self, request):
-        """GET /api/studios/by_date/?date=YYYY-MM-DD"""
         target = request.query_params.get("date")
         if not target:
             return Response({"error": "Missing 'date' parameter."}, status=status.HTTP_400_BAD_REQUEST)
@@ -173,9 +176,40 @@ class StudioViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(qs, many=True).data)
 
 
-# ============================================================================
-#                                Events
-# ============================================================================
+# ====================================================================
+# Private Bookings
+# ====================================================================
+class PrivateBookingViewSet(viewsets.ModelViewSet):
+    queryset = PrivateBooking.objects.all().order_by("-id")
+    serializer_class = PrivateBookingSerializer
+    pagination_class = DefaultPagination
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["customer", "event_type", "venue", "email", "contact_number", "address", "notes"]
+    ordering_fields = ["date", "time_slot", "duration", "guest_count", "created_at"]
+    ordering = ["-date", "-time_slot"]
+
+    @action(detail=False, methods=["get"])
+    def by_date(self, request):
+        target = request.query_params.get("date")
+        if not target:
+            return Response({"error": "Missing 'date' parameter."}, status=status.HTTP_400_BAD_REQUEST)
+        qs = self.get_queryset().filter(date=target).order_by("time_slot")
+        return Response(self.get_serializer(qs, many=True).data)
+
+    @action(detail=False, methods=["get"])
+    def stats(self, request):
+        qs = self.get_queryset()
+        total = qs.count()
+        total_duration = sum(float(x.duration or 0) for x in qs)
+        avg_duration = round(total_duration / total, 2) if total else 0.0
+        total_guests = sum(int(x.guest_count or 0) for x in qs)
+        return Response({"total_bookings": total, "avg_duration": avg_duration, "total_guests": total_guests})
+
+
+# ====================================================================
+# Events
+# ====================================================================
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all()
     serializer_class = EventSerializer
@@ -187,7 +221,6 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def upcoming(self, request):
-        """GET /api/events/upcoming/?days=30"""
         try:
             days = int(request.query_params.get("days", 30))
         except ValueError:
@@ -202,7 +235,6 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def by_location(self, request):
-        """GET /api/events/by_location/?q=Mumbai"""
         q = request.query_params.get("q", "").strip()
         if not q:
             return Response({"error": "Missing 'q' parameter."}, status=status.HTTP_400_BAD_REQUEST)
@@ -210,9 +242,9 @@ class EventViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(qs, many=True).data)
 
 
-# ============================================================================
-#                                 Shows
-# ============================================================================
+# ====================================================================
+# Shows
+# ====================================================================
 class ShowViewSet(viewsets.ModelViewSet):
     queryset = Show.objects.all()
     serializer_class = ShowSerializer
@@ -224,7 +256,6 @@ class ShowViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def upcoming(self, request):
-        """GET /api/shows/upcoming/?days=30"""
         try:
             days = int(request.query_params.get("days", 30))
         except ValueError:
@@ -239,7 +270,6 @@ class ShowViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def by_location(self, request):
-        """GET /api/shows/by_location/?q=Pune"""
         q = request.query_params.get("q", "").strip()
         if not q:
             return Response({"error": "Missing 'q' parameter."}, status=status.HTTP_400_BAD_REQUEST)
@@ -247,9 +277,31 @@ class ShowViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(qs, many=True).data)
 
 
-# ============================================================================
-#                                Payments
-# ============================================================================
+# ====================================================================
+# Photography (OLD NAMES)
+# ====================================================================
+class PhotographyBookingViewSet(viewsets.ModelViewSet):
+    queryset = PhotographyBooking.objects.all().order_by("-date", "-created_at")
+    serializer_class = PhotographyBookingSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    parser_classes = [parsers.JSONParser, parsers.FormParser]  # no uploads
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["client","email","contact_number","event_type","package_type","location","notes"]
+    ordering_fields = ["date","created_at","price","photographers_count","videographers_count"]
+    ordering = ["-date","-created_at"]
+
+    @action(detail=False, methods=["get"])
+    def today(self, request):
+        qs = self.get_queryset().filter(date=now().date())
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(qs, many=True).data)
+
+
+# ====================================================================
+# Payments
+# ====================================================================
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
@@ -261,46 +313,52 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def total(self, request):
-        """GET /api/payments/total/  -> {"total_collected": 12345.67}"""
         agg = self.get_queryset().aggregate(total=Sum("amount"))
         total_amount = agg["total"] or 0
         return Response({"total_collected": total_amount})
 
 
-# ============================================================================
-#                             Videography
-# ============================================================================
+# ====================================================================
+# Videography
+# ====================================================================
 class VideographyViewSet(viewsets.ModelViewSet):
-    queryset = Videography.objects.all()
+    """
+    /api/auth/videography/
+    """
+    queryset = Videography.objects.all().order_by("-created_at")
     serializer_class = VideographySerializer
-    pagination_class = DefaultPagination
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["project", "editor", "remarks"]
-    ordering_fields = ["duration", "delivery_date", "created_at"]
+    search_fields = [
+        "client_name",
+        "project",
+        "editor",
+        "email",
+        "mobile_no",
+        "location",
+        "package_type",
+        "payment_method",
+        "notes",
+    ]
+    ordering_fields = [
+        "created_at",
+        "updated_at",
+        "shoot_date",
+        "start_time",
+        "duration_hours",
+        "project",
+        "editor",
+        "package_type",
+        "payment_method",
+    ]
     ordering = ["-created_at"]
 
-    @action(detail=False, methods=["get"])
-    def stats(self, request):
-        """
-        GET /api/videography/stats/
-        -> {"total_projects": N, "total_duration_hours": X, "average_duration_hours": Y}
-        """
-        projects = self.get_queryset()
-        count = projects.count()
-        total_duration = sum(float(p.duration or 0) for p in projects)
-        avg_duration = round(total_duration / count, 2) if count else 0
-        return Response(
-            {"total_projects": count, "total_duration_hours": total_duration, "average_duration_hours": avg_duration}
-        )
 
-
-# ============================================================================
-#                            Equipment (Master)
-# ============================================================================
+# ====================================================================
+# Equipment (master)
+# ====================================================================
 class EquipmentViewSet(viewsets.ModelViewSet):
-    """
-    CRUD for rentable equipment (inventory master).
-    """
     queryset = Equipment.objects.all()
     serializer_class = EquipmentSerializer
     pagination_class = DefaultPagination
@@ -311,9 +369,6 @@ class EquipmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def low_stock(self, request):
-        """
-        GET /api/equipment/low_stock/?threshold=3
-        """
         try:
             threshold = int(request.query_params.get("threshold", 3))
         except ValueError:
@@ -324,9 +379,6 @@ class EquipmentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def available(self, request):
-        """
-        GET /api/equipment/available/?date=YYYY-MM-DD[&equipment=<id>]
-        """
         target = request.query_params.get("date")
         if not target:
             return Response({"error": "Missing 'date' parameter."}, status=status.HTTP_400_BAD_REQUEST)
@@ -358,13 +410,10 @@ class EquipmentViewSet(viewsets.ModelViewSet):
         return Response({"date": target, "results": results})
 
 
-# ============================================================================
-#                           Equipment Rentals
-# ============================================================================
+# ====================================================================
+# Equipment Rentals
+# ====================================================================
 class EquipmentRentalViewSet(viewsets.ModelViewSet):
-    """
-    Rental bookings that decrease available quantity on a date.
-    """
     queryset = EquipmentRental.objects.select_related("equipment", "created_by").all()
     serializer_class = EquipmentRentalSerializer
     pagination_class = DefaultPagination
@@ -375,7 +424,6 @@ class EquipmentRentalViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def by_equipment(self, request):
-        """GET /api/equipment-rentals/by_equipment/?id=<equipment_id>"""
         eq_id = request.query_params.get("id")
         if not eq_id:
             return Response({"error": "Missing 'id' parameter."}, status=status.HTTP_400_BAD_REQUEST)
@@ -384,7 +432,6 @@ class EquipmentRentalViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def on_date(self, request):
-        """GET /api/equipment-rentals/on_date/?date=YYYY-MM-DD"""
         target = request.query_params.get("date")
         if not target:
             return Response({"error": "Missing 'date' parameter."}, status=status.HTTP_400_BAD_REQUEST)
@@ -392,14 +439,10 @@ class EquipmentRentalViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(qs, many=True).data)
 
 
-# ============================================================================
-#                    Flat UI Endpoint (your React form)
-# ============================================================================
+# ====================================================================
+# Flat Equipment Entry (UI)
+# ====================================================================
 class EquipmentEntryViewSet(viewsets.ModelViewSet):
-    """
-    Simplified, flat equipment endpoint that your React UI calls:
-    GET/POST: /api/auth/equipment/
-    """
     queryset = EquipmentEntry.objects.all().order_by("-created_at")
     serializer_class = EquipmentEntrySerializer
     pagination_class = DefaultPagination
@@ -409,3 +452,27 @@ class EquipmentEntryViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "category", "brand", "status", "rented_by"]
     ordering_fields = ["created_at", "price_per_day", "name"]
     ordering = ["-created_at"]
+
+
+# ====================================================================
+# Sound System (Service)  — NEW
+# ====================================================================
+# api/views.py
+from rest_framework import parsers
+
+class SoundViewSet(viewsets.ModelViewSet):
+    queryset = Sound.objects.all().order_by("-event_date", "-created_at")
+    serializer_class = SoundSerializer
+    pagination_class = DefaultPagination
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    parser_classes = [parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser]  # ✅ add this
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "client_name", "email", "mobile_no",
+        "system_type", "location", "mixer_model", "notes"
+    ]
+    ordering_fields = [
+        "event_date", "created_at", "price",
+        "speakers_count", "microphones_count", "system_type"
+    ]
+    ordering = ["-event_date", "-created_at"]

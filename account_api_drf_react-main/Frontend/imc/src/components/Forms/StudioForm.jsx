@@ -2,7 +2,21 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Forms.css";
 
-const API_URL = "http://127.0.0.1:8000/api/auth/studios/";
+const BASE = import.meta?.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
+const API_URL = `${BASE}/auth/studios/`;
+
+// Create a tiny axios client that injects JWT if present
+const api = axios.create();
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access");
+  if (token) {
+    config.headers = {
+      ...(config.headers || {}),
+      Authorization: `Bearer ${token}`,
+    };
+  }
+  return config;
+});
 
 /**
  * StudioForm — advanced
@@ -49,12 +63,18 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
   const [formData, setFormData] = useState(emptyForm);
 
   // ---------- Helpers ----------
-  const formatErr = (err) => {
-    if (err?.response?.data) {
+  const humanizeErr = (err) => {
+    // DRF error can be dict of arrays: {field: ["msg"]}
+    const data = err?.response?.data;
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      const firstKey = Object.keys(data)[0];
+      const val = data[firstKey];
+      if (Array.isArray(val)) return `${firstKey}: ${val[0]}`;
+      if (typeof val === "string") return `${firstKey}: ${val}`;
       try {
-        return JSON.stringify(err.response.data, null, 2);
-      } catch (_) {
-        return String(err.response.data);
+        return JSON.stringify(data, null, 2);
+      } catch {
+        return String(data);
       }
     }
     return err?.message || "Unknown error";
@@ -75,10 +95,14 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     setLoading(true);
     clearStatus();
     try {
-      const { data } = await axios.get(API_URL);
-      setStudios(Array.isArray(data) ? data : []);
+      const { data } = await api.get(API_URL);
+      const rows = Array.isArray(data) ? data : data?.results ?? data ?? [];
+      setStudios(Array.isArray(rows) ? rows : []);
+      // keep page in range if list shrank
+      const totalPagesAfter = Math.max(1, Math.ceil((rows?.length || 0) / pageSize));
+      if (page > totalPagesAfter) setPage(totalPagesAfter);
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     } finally {
       setLoading(false);
     }
@@ -86,6 +110,7 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
 
   useEffect(() => {
     fetchStudios();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------- Derived (filtered + paginated) ----------
@@ -146,7 +171,7 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
       studio_name: row.studio_name || "",
       date: row.date || "",
       time_slot: row.time_slot || "",
-      duration: row.duration || "",
+      duration: row.duration ?? "",
       payment_methods: Array.isArray(row.payment_methods) ? row.payment_methods : [],
     });
     clearStatus();
@@ -156,11 +181,15 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     if (!window.confirm("Delete this booking?")) return;
     clearStatus();
     try {
-      await axios.delete(`${API_URL}${id}/`);
+      await api.delete(`${API_URL}${id}/`);
       setStudios((prev) => prev.filter((r) => r.id !== id));
       toast("🗑️ Deleted");
+      // keep page in range after delete
+      const after = studios.length - 1;
+      const pages = Math.max(1, Math.ceil(after / pageSize));
+      if (page > pages) setPage(pages);
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     }
   };
 
@@ -193,6 +222,8 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     const payload = {
       ...formData,
       duration: Number(formData.duration),
+      // empty string must be sent as null for DRF TimeField
+      time_slot: formData.time_slot ? formData.time_slot : null,
       payment_methods: Array.isArray(formData.payment_methods)
         ? formData.payment_methods
         : [],
@@ -201,17 +232,17 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     setSaving(true);
     try {
       if (isEdit) {
-        await axios.put(`${API_URL}${editingId}/`, payload);
+        await api.put(`${API_URL}${editingId}/`, payload);
         toast("✅ Booking updated");
       } else {
-        await axios.post(API_URL, payload);
+        await api.post(API_URL, payload);
         toast("✅ Booking added");
       }
       await fetchStudios();
       resetForm();
       setTab("VIEW");
     } catch (err) {
-      setError(formatErr(err));
+      setError(humanizeErr(err));
     } finally {
       setSaving(false);
     }
@@ -222,9 +253,28 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     <div className="form-container pro">
       <div className="form-header">
         <h3>🎙️ Studio Rentals</h3>
-       
-        <button className="close-x" onClick={onClose} aria-label="Close">
-          ✖
+        {onClose && (
+          <button className="close-x" onClick={onClose} aria-label="Close">
+            ✖
+          </button>
+        )}
+      </div>
+
+      {/* Tabs (optional) */}
+      <div className="tabs" style={{ marginBottom: 8 }}>
+        <button
+          className={`tab ${tab === "ADD" ? "active" : ""}`}
+          onClick={() => setTab("ADD")}
+          type="button"
+        >
+          ➕ Add
+        </button>
+        <button
+          className={`tab ${tab === "VIEW" ? "active" : ""}`}
+          onClick={() => setTab("VIEW")}
+          type="button"
+        >
+          👁 View
         </button>
       </div>
 
@@ -419,12 +469,13 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
                             : "-"}
                         </td>
                         <td className="right">
-                          <button className="mini" onClick={() => handleEdit(s)}>
+                          <button className="mini" onClick={() => handleEdit(s)} disabled={saving}>
                             ✏️ Edit
                           </button>
                           <button
                             className="mini danger"
                             onClick={() => handleDelete(s.id)}
+                            disabled={saving}
                           >
                             🗑 Delete
                           </button>

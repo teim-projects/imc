@@ -1,4 +1,4 @@
-# serializers.py
+# api/serializers.py
 from decimal import Decimal, InvalidOperation
 import re
 from datetime import date
@@ -20,7 +20,8 @@ from dj_rest_auth.serializers import LoginSerializer, UserDetailsSerializer
 
 from .models import (
     Studio, Event, Show, Payment, Videography, CustomUser,
-    Equipment, EquipmentRental, EquipmentEntry
+    Equipment, EquipmentRental, EquipmentEntry, PrivateBooking,
+    PhotographyBooking, Sound,   # <-- use Sound (not SoundSetup)
 )
 
 # ---------------------------------------------------------------------
@@ -37,6 +38,27 @@ def to_decimal_or_zero(val):
         return Decimal(str(val))
     except (InvalidOperation, ValueError, TypeError):
         raise serializers.ValidationError("Enter a valid numeric amount.")
+
+phone_regex = re.compile(r"\+?\d{7,15}")
+
+def _validate_phone(value: str):
+    if value in (None, ""):
+        return value
+    if not phone_regex.fullmatch(value.strip()):
+        raise serializers.ValidationError("Enter a valid phone number (7–15 digits, optional +).")
+    return value
+
+def _ensure_hms(t: str) -> str:
+    """
+    If 't' is 'HH:MM' -> convert to 'HH:MM:00'. If already 'HH:MM:SS', return as-is.
+    """
+    if not t:
+        return t
+    s = str(t).strip()
+    if re.fullmatch(r"\d{2}:\d{2}", s):
+        return f"{s}:00"
+    return s
+
 
 # ---------------------------------------------------------------------
 # Studio
@@ -58,30 +80,19 @@ class StudioSerializer(serializers.ModelSerializer):
         }
 
     def to_internal_value(self, data):
-        """
-        Normalize incoming payload:
-        - Accept CSV for payment_methods and turn into list
-        - Convert empty-string time_slot "" -> None (so TimeField accepts it)
-        """
         data = data.copy()
 
-        # Normalize payment_methods: CSV -> list
         pm = data.get("payment_methods")
         if isinstance(pm, str):
             data["payment_methods"] = [s.strip() for s in pm.split(",") if s.strip()]
 
-        # Normalize empty time string -> None
         if data.get("time_slot", None) == "":
             data["time_slot"] = None
 
         return super().to_internal_value(data)
 
     def validate_contact_number(self, value):
-        if value in (None, ""):
-            return value
-        if not re.fullmatch(r"\+?\d{7,15}", value.strip()):
-            raise serializers.ValidationError("Enter a valid phone number (7–15 digits, optional +).")
-        return value
+        return _validate_phone(value)
 
     def validate_duration(self, value):
         if value is None or float(value) <= 0:
@@ -89,7 +100,6 @@ class StudioSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-        # store payment_methods as CSV in the DB
         pm = validated_data.pop("payment_methods", [])
         obj = Studio(**validated_data)
         obj.payment_methods = ", ".join(pm) if pm else ""
@@ -109,21 +119,94 @@ class StudioSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep["payment_methods"] = instance.payment_list  # always list for UI
+        # expects `payment_list` property on model (already present)
+        rep["payment_methods"] = instance.payment_list
         return rep
+
+
+# ---------------------------------------------------------------------
+# Private Booking
+# ---------------------------------------------------------------------
+class PrivateBookingSerializer(serializers.ModelSerializer):
+    payment_methods = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        allow_empty=True
+    )
+
+    class Meta:
+        model = PrivateBooking
+        fields = "__all__"
+        read_only_fields = ("created_at", "updated_at")
+        extra_kwargs = {
+            "time_slot": {"required": False, "allow_null": True},
+            "guest_count": {"required": False, "allow_null": True},
+            "notes": {"required": False, "allow_blank": True},
+        }
+
+    def validate_contact_number(self, value):
+        return _validate_phone(value)
+
+    def validate_duration(self, value):
+        if value is None or float(value) <= 0:
+            raise serializers.ValidationError("Duration must be greater than 0.")
+        return value
+
+    def to_internal_value(self, data):
+        data = data.copy()
+        if data.get("time_slot", None) == "":
+            data["time_slot"] = None
+        pm = data.get("payment_methods")
+        if isinstance(pm, str):
+            data["payment_methods"] = [s.strip() for s in pm.split(",") if s.strip()]
+        return super().to_internal_value(data)
+
+
+# ---------------------------------------------------------------------
+# Photography: Booking (OLD field names to match your DB)
+# ---------------------------------------------------------------------
+class PhotographyBookingSerializer(serializers.ModelSerializer):
+    # UI aliases and single-select payment
+    payment_methods_list = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+
+    class Meta:
+        model = PhotographyBooking
+        fields = "__all__"
+
+    def to_internal_value(self, data):
+        m = data.copy()
+        # aliases
+        if "client_name" in m and "client" not in m:
+            m["client"] = m["client_name"]
+        if "mobile_no" in m and "contact_number" not in m:
+            m["contact_number"] = m["mobile_no"]
+        if "shoot_date" in m and "date" not in m:
+            m["date"] = m["shoot_date"]
+        # time normalize
+        if isinstance(m.get("start_time"), str):
+            m["start_time"] = _ensure_hms(m["start_time"])
+        # payment list -> CSV
+        pm = m.get("payment_methods_list")
+        if isinstance(pm, list):
+            m["payment_methods"] = ",".join([str(x).strip().title() for x in pm if str(x).strip()])
+        return super().to_internal_value(m)
+
+    def validate_contact_number(self, v):
+        return _validate_phone(v)
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        csv = (instance.payment_methods or "").strip()
+        rep["payment_methods_list"] = [s.strip() for s in csv.split(",") if s.strip()]
+        return rep
+
 
 # ---------------------------------------------------------------------
 # Event / Show
 # ---------------------------------------------------------------------
 class _BaseEventShowSerializer(serializers.ModelSerializer):
-    """
-    Shared validation/normalization for Event and Show.
-    Assumes model has: title, location, date, ticket_price, description.
-    """
-
     def to_internal_value(self, data):
         data = super().to_internal_value(data)
-        # Ensure ticket_price always a Decimal
         data["ticket_price"] = to_decimal_or_zero(data.get("ticket_price"))
         return data
 
@@ -135,9 +218,7 @@ class _BaseEventShowSerializer(serializers.ModelSerializer):
         return Decimal(value)
 
     def validate_date(self, value):
-        # Uncomment if you want to forbid past dates:
-        # if value < date.today():
-        #     raise serializers.ValidationError("Date cannot be in the past.")
+        # if value < date.today(): raise serializers.ValidationError("Date cannot be in the past.")
         return value
 
 class EventSerializer(_BaseEventShowSerializer):
@@ -151,6 +232,7 @@ class ShowSerializer(_BaseEventShowSerializer):
         model = Show
         fields = "__all__"
         read_only_fields = ("created_at", "updated_at")
+
 
 # ---------------------------------------------------------------------
 # Payment
@@ -175,26 +257,66 @@ class PaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Amount must be greater than 0.")
         return Decimal(value)
 
+
 # ---------------------------------------------------------------------
 # Videography
 # ---------------------------------------------------------------------
 class VideographySerializer(serializers.ModelSerializer):
+    duration_hours = serializers.DecimalField(
+        max_digits=5, decimal_places=2, required=False
+    )
+
     class Meta:
         model = Videography
-        fields = "__all__"
+        fields = [
+            "id",
+            "client_name", "email", "mobile_no",
+            "project", "editor",
+            "shoot_date", "start_time",
+            "duration_hours",
+            "location", "package_type",
+            "payment_method", "notes",
+            "created_at", "updated_at",
+        ]
         read_only_fields = ("created_at", "updated_at")
 
-    def validate_duration(self, value):
-        if value is None or float(value) <= 0:
-            raise serializers.ValidationError("Duration must be greater than 0.")
-        return value
+    def _to_decimal(self, val):
+        if val in (None, ""):
+            return None
+        try:
+            return Decimal(str(val))
+        except (InvalidOperation, ValueError, TypeError):
+            raise serializers.ValidationError("duration_hours must be a number (hours).")
+
+    def validate(self, attrs):
+        data = getattr(self, "initial_data", {}) or {}
+        raw = data.get("duration_hours", None)
+        legacy = data.get("duration", None)  # accept old key
+        chosen = raw if raw not in (None, "") else legacy
+        hours = self._to_decimal(chosen)
+
+        if hours is None:
+            # keep model default if not supplied
+            if "duration_hours" not in attrs:
+                attrs["duration_hours"] = Decimal("1.0")
+        else:
+            if hours <= 0:
+                raise serializers.ValidationError({"duration_hours": "Must be greater than 0."})
+            attrs["duration_hours"] = hours
+
+        # Required core fields
+        for key in ("project", "editor", "shoot_date"):
+            if not attrs.get(key) and not getattr(self.instance, key, None):
+                raise serializers.ValidationError({key: "This field is required."})
+
+        return attrs
+
 
 # =====================================================================
 # ===================== Authentication Serializers ====================
 # =====================================================================
 User = get_user_model()
 
-# -------- Register --------
 class CustomRegisterSerializer(RegisterSerializer):
     """
     Extends dj-rest-auth RegisterSerializer to support:
@@ -209,25 +331,20 @@ class CustomRegisterSerializer(RegisterSerializer):
         max_length=15,
         validators=[UniqueValidator(queryset=User.objects.all(), message="This mobile number is already registered.")]
     )
-    # accept image (nullable/optional)
     profile_photo = serializers.ImageField(required=False, allow_null=True)
 
     def validate_mobile_no(self, v: str):
         v = (v or "").strip()
         if v == "":
             return v
-        if not re.fullmatch(r"\+?\d{7,15}", v):
-            raise serializers.ValidationError("Enter a valid phone (7–15 digits, optional +).")
-        return v
+        return _validate_phone(v)
 
     def get_cleaned_data(self):
         data = super().get_cleaned_data()
         data["mobile_no"] = self.validated_data.get("mobile_no", "")
-        # map alternate client key 'photo' -> 'profile_photo' if present
         if "profile_photo" in self.validated_data:
             data["profile_photo"] = self.validated_data.get("profile_photo")
         elif self.context and (req := self.context.get("request")):
-            # allow files['photo'] if frontend sent PHOTO_FIELD_NAME="photo"
             data["profile_photo"] = req.FILES.get("photo", None)
         return data
 
@@ -236,7 +353,6 @@ class CustomRegisterSerializer(RegisterSerializer):
         user = super().save(request)  # creates user with email/password
         user.mobile_no = self.validated_data.get("mobile_no", "")
 
-        # Attach photo if provided
         photo = (
             self.validated_data.get("profile_photo")
             or (request.FILES.get("photo") if request and hasattr(request, "FILES") else None)
@@ -247,11 +363,9 @@ class CustomRegisterSerializer(RegisterSerializer):
         try:
             user.save()
         except IntegrityError:
-            # convert DB unique error to a proper 400
             raise serializers.ValidationError({"mobile_no": ["This mobile number is already registered."]})
         return user
 
-# -------- Login (email or mobile) --------
 class CustomLoginSerializer(LoginSerializer):
     username = None
     email_or_mobile = serializers.CharField(required=True)
@@ -264,10 +378,8 @@ class CustomLoginSerializer(LoginSerializer):
         if not email_or_mobile or not password:
             raise serializers.ValidationError("Both email/mobile and password are required.")
 
-        # First, try built-in authenticate (may work if AUTHENTICATION_BACKENDS accept email)
         user = authenticate(username=email_or_mobile, password=password)
 
-        # If that fails, resolve user by email/mobile manually
         if not user:
             try:
                 if '@' in email_or_mobile:
@@ -286,9 +398,7 @@ class CustomLoginSerializer(LoginSerializer):
         attrs['user'] = user
         return attrs
 
-# -------- User Details (GET /api/auth/dj-rest-auth/user/) --------
 class CustomUserDetailsSerializer(UserDetailsSerializer):
-    # return a URL for the image so frontend can render directly
     profile_photo = serializers.ImageField(read_only=True, use_url=True, allow_null=True, required=False)
 
     class Meta:
@@ -301,7 +411,10 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
         rep['full_name'] = f"{(instance.first_name or '').strip()} {(instance.last_name or '').strip()}".strip()
         return rep
 
-# -------- Password Reset (request) --------
+
+# ---------------------------------------------------------------------
+# Password Reset (request & confirm)
+# ---------------------------------------------------------------------
 class PasswordResetRequestSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
@@ -318,8 +431,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = PasswordResetTokenGenerator().make_token(user)
 
-        # FRONTEND_URL should be something like: "http://localhost:5173/password-reset-confirm"
-        frontend_url = getattr(settings, "FRONTEND_URL", "")
+        frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173/password-reset-confirm")
         if not frontend_url.endswith("/"):
             frontend_url = f"{frontend_url}/"
         reset_link = f"{frontend_url}{uid}/{token}/"
@@ -328,12 +440,12 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         context = {"user": user, "reset_link": reset_link}
         body = render_to_string("registration/custom_password_reset_email.html", context)
 
-        email = EmailMultiAlternatives(subject, body, settings.DEFAULT_FROM_EMAIL, [user.email])
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@example.com")
+        email = EmailMultiAlternatives(subject, body, from_email, [user.email])
         email.send()
 
         return {"detail": "Password reset email sent successfully."}
 
-# -------- Password Reset (confirm) --------
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uidb64 = serializers.CharField()
     token = serializers.CharField()
@@ -359,11 +471,11 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
         return {"detail": "Password has been reset successfully."}
 
+
 # ---------------------------------------------------------------------
 # Equipment Entry (flat UI model used by your React form)
 # ---------------------------------------------------------------------
 class EquipmentEntrySerializer(serializers.ModelSerializer):
-    # Expose alias that the UI sends/reads
     equipment_name = serializers.CharField(source="name", required=False, allow_blank=True)
     photo = serializers.ImageField(required=False, allow_null=True)
 
@@ -371,8 +483,8 @@ class EquipmentEntrySerializer(serializers.ModelSerializer):
         model = EquipmentEntry
         fields = [
             "id",
-            "equipment_name",   # alias of 'name' for the UI
-            "name",             # keep original too (debugging)
+            "equipment_name",
+            "name",
             "category",
             "brand",
             "price_per_day",
@@ -387,14 +499,12 @@ class EquipmentEntrySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["created_at", "updated_at"]
 
-    # Accept either 'name' or 'equipment_name' from the UI
     def to_internal_value(self, data):
         data = data.copy()
         if not data.get("name") and data.get("equipment_name"):
             data["name"] = data["equipment_name"]
         return super().to_internal_value(data)
 
-    # Return absolute photo URL and always include alias
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         request = self.context.get("request")
@@ -403,13 +513,11 @@ class EquipmentEntrySerializer(serializers.ModelSerializer):
             rep["photo"] = request.build_absolute_uri(rep["photo"])
         return rep
 
+
 # ---------------------------------------------------------------------
-# Equipment Master + Equipment Rental Serializers (used in views)
+# Equipment Master / Rentals
 # ---------------------------------------------------------------------
 class EquipmentSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Equipment master model.
-    """
     class Meta:
         model = Equipment
         fields = [
@@ -423,7 +531,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+    read_only_fields = ["created_at", "updated_at"]
 
     def validate_quantity_in_stock(self, value):
         if value is not None and value < 0:
@@ -435,11 +543,8 @@ class EquipmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Rate per day must be positive.")
         return value
 
+
 class EquipmentRentalSerializer(serializers.ModelSerializer):
-    """
-    Serializer for EquipmentRental model (bookings).
-    Includes nested Equipment name for readability.
-    """
     equipment_name = serializers.CharField(source="equipment.name", read_only=True)
 
     class Meta:
@@ -469,9 +574,93 @@ class EquipmentRentalSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        # optional consistency check for rental/return dates
         rental_date = attrs.get("rental_date")
         return_date = attrs.get("return_date")
         if return_date and rental_date and return_date < rental_date:
             raise serializers.ValidationError("Return date cannot be before rental date.")
         return attrs
+
+
+# ---------------------------------------------------------------------
+# Sound System (Service) – matches Sound model
+# ---------------------------------------------------------------------
+# api/serializers.py
+from decimal import Decimal
+from rest_framework import serializers
+from .models import Sound
+import re
+
+class SoundSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sound
+        fields = "__all__"
+        read_only_fields = ("created_at",)
+        extra_kwargs = {
+            "email": {"required": False, "allow_null": True, "allow_blank": True},
+            "mobile_no": {"required": False, "allow_null": True, "allow_blank": True},
+            "location": {"required": False, "allow_null": True, "allow_blank": True},
+            "system_type": {"required": False, "allow_null": True, "allow_blank": True},
+            "mixer_model": {"required": False, "allow_null": True, "allow_blank": True},
+            "notes": {"required": False, "allow_null": True, "allow_blank": True},
+            "event_date": {"required": False, "allow_null": True},
+            "payment_method": {"required": False},  # model default is "Cash"
+        }
+
+    def _blank_to_none(self, v):
+        return None if (isinstance(v, str) and v.strip() == "") else v
+
+    def _to_int_or_zero(self, v):
+        if v in (None, "", "null"):
+            return 0
+        try:
+            return int(v)
+        except Exception:
+            return 0  # TEMP: coerce invalid to 0
+
+    def _to_decimal_or_zero(self, v):
+        if v in (None, "", "null"):
+            return Decimal("0")
+        try:
+            return Decimal(str(v))
+        except Exception:
+            return Decimal("0")  # TEMP: coerce invalid to 0
+
+    def to_internal_value(self, data):
+        d = data.copy()
+
+        # Map legacy SoundSetup keys if they appear
+        if "setup_date" in d and "event_date" not in d:
+            d["event_date"] = d.get("setup_date")
+        if "equipment" in d and "system_type" not in d:
+            d["system_type"] = d.get("equipment")
+        if "technician" in d and "notes" not in d:
+            tech = str(d.get("technician") or "").strip()
+            d["notes"] = f"Technician: {tech}" if tech else d.get("notes")
+
+        # Normalize empties
+        for k in ["email", "mobile_no", "location", "system_type", "mixer_model", "notes"]:
+            d[k] = self._blank_to_none(d.get(k))
+        d["event_date"] = self._blank_to_none(d.get("event_date"))
+
+        # Numbers
+        d["speakers_count"] = self._to_int_or_zero(d.get("speakers_count"))
+        d["microphones_count"] = self._to_int_or_zero(d.get("microphones_count"))
+        d["price"] = self._to_decimal_or_zero(d.get("price"))
+
+        # Payment choice
+        pm = (d.get("payment_method") or "").strip().lower()
+        d["payment_method"] = {"upi": "UPI", "card": "Card", "cash": "Cash"}.get(pm, "Cash")
+
+        # Client name default
+        if not (d.get("client_name") or "").strip():
+            d["client_name"] = "Unnamed"
+
+        return super().to_internal_value(d)
+
+    # Keep validation extremely permissive for now
+    def validate_mobile_no(self, v):
+        if v in (None, ""):
+            return v
+        if not re.fullmatch(r"\+?\d{7,15}", str(v).strip()):
+            return ""  # TEMP: drop invalid mobile instead of erroring
+        return v

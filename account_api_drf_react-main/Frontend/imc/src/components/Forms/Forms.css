@@ -44,6 +44,12 @@
   --radius-12: 12px;
   --radius-15: 15px;
   --radius-16: 16px;
+
+  /* Surface + shadows used by pf-* */
+  --line: rgba(10,44,86,0.12);
+  --surface: rgba(255,255,255,0.75);
+  --glass: rgba(255,255,255,0.55);
+  --shadow: 0 14px 40px rgba(10,44,86,0.12);
 }
 
 /* ==========================
@@ -775,7 +781,13 @@ thead {
 ========================== */
 /* Old .form-wrapper -> use pro container look */
 .form-wrapper { /* removed invalid @apply */ }
-.form-wrapper { background: linear-gradient(180deg, #ffffff, var(--gray-50)); border: 1px solid rgba(10,44,86,.12); border-radius: var(--radius-16); box-shadow: 0 12px 40px rgba(10,44,86,.08); padding: 18px; }
+.form-wrapper {
+  background: linear-gradient(180deg, #ffffff, var(--gray-50));
+  border: 1px solid rgba(10,44,86,.12);
+  border-radius: var(--radius-16);
+  box-shadow: 0 12px 40px rgba(10,44,86,.08);
+  padding: 18px;
+}
 
 /* .records-table -> nice-table */
 .records-table { width: 100%; border-collapse: collapse; }
@@ -787,4 +799,451 @@ thead {
 .error-banner { background: #fff3f3; color: var(--red-700); border: 1px solid #ffd0d0; padding: 10px 12px; border-radius: 10px; margin: 8px 0; }
 
 /* .tabs .active button (older pattern) */
-.tabs button.active { background: var(--gold); color: var(--navy); border: 1px solid #ffbb33; border-radius: 999px; }
+.tabs button.active {
+  background: var(--gold);
+  color: var(--navy);
+  border: 1px solid #ffbb33;
+  border-radius: 999px;
+}
+
+/* =========================================================
+   PHOTOGRAPHY FORM THEME (pf-*) — exact match to component
+   (kept here to avoid another CSS file; uses same variables)
+========================================================= */
+.pf-wrap{
+  font-family: "Poppins", system-ui, Segoe UI, Roboto, Arial;
+  color: var(--text);
+}
+.pf-header{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin-bottom:14px;
+}
+.pf-header h2{
+  margin:0; font-size:1.3rem; font-weight:700; color:var(--navy);
+}
+.pf-tabs{ display:flex; gap:8px; }
+.pf-tabs button{
+  border:1px solid var(--line); background:#fff; padding:8px 14px; border-radius:999px;
+  cursor:pointer; transition:.2s; font-weight:600; color:var(--navy);
+}
+.pf-tabs button.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+
+.pf-banner{
+  padding:10px 12px; border-radius:12px; margin:10px 0; font-weight:600;
+}
+.pf-error{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+.pf-success{ background:#e9fbe7; color:#065f46; border:1px solid #bbf7d0; }
+
+.pf-form{ display:flex; flex-direction:column; gap:14px; }
+.pf-card{
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  border:1px solid var(--line); border-radius:var(--radius-16);
+  box-shadow: var(--shadow); padding:14px;
+}
+.pf-card h3{ margin:0 0 12px; color:var(--navy); font-size:1.05rem; }
+
+.pf-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+}
+.pf-grid label, .pf-wide{
+  display:flex; flex-direction:column; gap:6px; font-size:.92rem;
+  color: var(--navy);
+}
+.pf-wide{ margin-top:10px; }
+.pf-grid input, .pf-grid select, .pf-wide input, .pf-wide textarea{
+  border:1px solid var(--line); background:#fff; padding:10px 12px; border-radius:12px;
+  outline:none; color:var(--text);
+}
+.pf-grid textarea{ resize:vertical; }
+
+.pf-check{ display:flex; align-items:center; gap:8px; margin-top:auto; color:var(--text); }
+.pf-file input{ background:#fff; }
+
+.pf-methods{ display:flex; flex-direction:column; gap:6px; }
+.pf-tags{ display:flex; flex-wrap:wrap; gap:8px; }
+.tag{
+  border:1px solid var(--line); background:#fff; padding:6px 10px; border-radius:999px;
+  font-size:.85rem; cursor:pointer; color:var(--navy); font-weight:600;
+}
+.tag.active{ background:var(--gold); border-color:var(--gold); color:#000; }
+
+.pf-totals{
+  margin-top:12px; border-top:1px dashed var(--line); padding-top:10px;
+  display:grid; grid-template-columns:repeat(4,1fr); gap:8px;
+}
+.pf-totals > div{
+  display:flex; align-items:center; justify-content:space-between;
+  background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 10px;
+}
+.pf-grand{
+  background:linear-gradient(180deg, #fff, var(--cream));
+  border-color:var(--gold);
+  font-weight:700;
+}
+
+.pf-actions{ display:flex; gap:10px; margin-top:6px; }
+.btn{
+  background:var(--navy); color:#fff; border:none; border-radius:12px; padding:10px 14px;
+  cursor:pointer; font-weight:700; box-shadow:var(--shadow);
+}
+.btn.ghost{ background:#fff; color:var(--navy); border:1px solid var(--navy); }
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
+
+.pf-table-card{
+  background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow);
+}
+.pf-table-top{
+  display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px;
+  border-bottom:1px solid var(--line);
+}
+.pf-search{
+  flex:1; border:1px solid var(--line); padding:10px 12px; border-radius:12px; outline:none;
+}
+.pf-table-wrap{ overflow:auto; }
+.pf-table{ width:100%; border-collapse:separate; border-spacing:0; }
+.pf-table th, .pf-table td{
+  padding:10px 12px; border-bottom:1px solid var(--line); background:#fff;
+}
+.pf-table th{ text-align:left; color:var(--text-muted); font-weight:600; }
+.c{ text-align:center; }
+.td-main{ font-weight:700; color:var(--text); }
+.td-sub{ color:var(--text-muted); font-size:.85rem; }
+
+.chip{
+  display:inline-block; padding:4px 10px; border-radius:999px; font-size:.8rem; border:1px solid var(--line);
+  background:#f8fafc; color:#0f172a;
+}
+.chip.paid{ background:#e9fbe7; border-color:#bbf7d0; color:#065f46; }
+.chip.pending{ background:#fff7ed; border-color:#fed7aa; color:#9a3412; }
+.chip.partial{ background:#eef2ff; border-color:#c7d2fe; color:#3730a3; }
+
+.pf-pager{
+  display:flex; align-items:center; justify-content:center; gap:10px; padding:12px;
+}
+.mini{
+  border:1px solid var(--line); background:#fff; border-radius:10px; padding:6px 10px; cursor:pointer;
+  font-weight:600;
+}
+.mini.danger{ border-color:#fecaca; background:#fee2e2; color:#7a0e0e; }
+
+/* Responsive for pf- */
+@media (max-width: 1100px){
+  .pf-grid{ grid-template-columns:repeat(2,1fr); }
+  .pf-totals{ grid-template-columns:repeat(2,1fr); }
+}
+@media (max-width: 640px){
+  .pf-grid{ grid-template-columns:1fr; }
+  .pf-totals{ grid-template-columns:1fr; }
+}
+
+/* Dark mode for pf- */
+[data-theme="dark"] .pf-card{
+  background: rgba(17, 25, 45, 0.6);
+  border-color: rgba(255,255,255,0.08);
+}
+[data-theme="dark"] .pf-tabs button{
+  background: #0f1a2f;
+  border-color: rgba(255,255,255,0.08);
+  color: var(--text);
+}
+[data-theme="dark"] .pf-tabs button.active{
+  background: var(--gold);
+  color: #0a2c56;
+  border-color: var(--gold);
+}
+[data-theme="dark"] .pf-table-card{
+  background: #0b1220;
+  border-color: rgba(255,255,255,0.08);
+}
+[data-theme="dark"] .pf-table th,
+[data-theme="dark"] .pf-table td{
+  background: transparent;
+  border-bottom-color: #15223a;
+  color: var(--text);
+}
+
+/* =========================================================
+   VIDEOGRAPHY FORM – ADD-ON (maps VideographyForm.jsx classes)
+   Place at END
+========================================================= */
+
+/* Wrapper + tabs */
+.form-wrap{
+  background: linear-gradient(180deg, #ffffff, var(--gray-50));
+  border: 1px solid rgba(10,44,86,.12);
+  border-radius: var(--radius-16);
+  box-shadow: 0 12px 40px rgba(10,44,86,.08);
+  padding: 16px;
+  font-family: "Poppins", system-ui, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--text);
+}
+
+.tab-buttons{
+  display: inline-flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.tab-buttons button{
+  border: 1px solid var(--line);
+  background: #fff;
+  padding: 8px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--navy);
+  transition: .2s ease;
+}
+.tab-buttons button:hover{
+  transform: translateY(-1px);
+}
+.tab-buttons .active{
+  background: var(--gold);
+  color: var(--navy);
+  border-color: #ffbb33;
+}
+
+/* Add form */
+.styled-form{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.styled-form h2{
+  margin: 2px 0 6px;
+  font-size: 1.25rem;
+  color: var(--navy);
+  font-weight: 800;
+}
+.form-grid{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+}
+.form-grid label{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--navy);
+  font-weight: 600;
+}
+
+/* Checkbox inline look */
+.checkbox{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px; /* aligns with inputs in the row */
+  color: var(--text);
+}
+.checkbox input{
+  accent-color: var(--orange);
+}
+
+/* Feedback */
+.error-msg,
+.success-msg{
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+.error-msg{
+  background: #fff3f3;
+  color: var(--red-700);
+  border: 1px solid #ffd0d0;
+}
+.success-msg{
+  background: #e8fff2;
+  color: var(--green-600);
+  border: 1px solid #bdf0cf;
+}
+
+/* View tab */
+.view-section h2{
+  margin: 4px 0 10px;
+  font-size: 1.15rem;
+  color: var(--navy);
+  font-weight: 800;
+}
+.styled-table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.styled-table thead th{
+  background: var(--gray-100);
+  color: var(--navy);
+  text-transform: none;
+  letter-spacing: .2px;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.styled-table th,
+.styled-table td{
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gray-500);
+}
+.styled-table tbody tr:hover{
+  background: #fffdf4;
+}
+
+/* Buttons inside the form */
+.styled-form button[type="submit"]{
+  align-self: flex-start;
+  background: linear-gradient(135deg, var(--blue-500), var(--blue-700));
+  box-shadow: 0 4px 12px rgba(0,153,255,.3);
+  border: none;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-weight: 800;
+}
+.styled-form button[type="submit"]:hover{
+  background: linear-gradient(135deg, var(--blue-400), var(--blue-800));
+  transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 860px){
+  .form-grid{ grid-template-columns: 1fr; }
+}
+
+/* Dark mode tweaks for these classes */
+[data-theme="dark"] .form-wrap{
+  background: linear-gradient(180deg, #0b1220, #0d1628);
+  border-color: rgba(255,210,63,.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+  color: var(--text);
+}
+[data-theme="dark"] .tab-buttons button{
+  background: var(--gray-150);
+  color: var(--text);
+  border-color: var(--gray-300);
+}
+[data-theme="dark"] .tab-buttons .active{
+  background: var(--gold);
+  color: #0a2c56;
+  border-color: var(--gold);
+}
+[data-theme="dark"] .styled-table{
+  background: #0b1220;
+  border-color: var(--gray-200);
+}
+[data-theme="dark"] .styled-table thead th{
+  background: #0e1628;
+  color: #dbe7ff;
+}
+[data-theme="dark"] .styled-table td,
+[data-theme="dark"] .styled-table th{
+  border-bottom-color: #15223a;
+}
+
+/* =========================================================
+   SOUND SERVICE – "Shows-like" UI block (scoped)
+   Place at END of Forms.css
+========================================================= */
+
+/* Wrapper card */
+.card-surface{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+  box-shadow: var(--shadow);
+}
+
+/* Top toolbar (title + Add/View pills) */
+.card-surface .toolbar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; flex-wrap:wrap; margin-bottom:10px;
+}
+.card-surface .title{ display:flex; align-items:center; gap:10px;
+  font-size:1.6rem; font-weight:700; color:var(--navy);
+}
+.card-surface .title .emoji{ font-size:1.5rem; }
+
+/* Search row */
+.card-surface .search-row{
+  display:flex; gap:12px; align-items:center; margin:12px 0;
+}
+.card-surface .search-input{
+  flex:1; padding:12px 14px; border:1px solid var(--gray-350);
+  border-radius:14px; background:#fff; outline:none; font-size:.95rem;
+}
+
+/* Scoped button family (avoid conflicts with global .btn) */
+.card-surface .btn{
+  border:1px solid rgba(10,44,86,.12);
+  background:#fff; padding:10px 14px; border-radius:14px;
+  box-shadow:0 6px 16px rgba(10,44,86,.06);
+  cursor:pointer; font-weight:600;
+}
+.card-surface .btn:hover{ box-shadow:0 10px 22px rgba(10,44,86,.12); }
+.card-surface .btn-primary{ background: var(--gold); border-color: transparent; color: var(--navy); }
+.card-surface .btn-accent{ background:#ffecc0; border-color:transparent; color: var(--navy); }
+.card-surface .btn-soft{ background:#fff7ed; }
+.card-surface .btn-danger{ background:#fde2e1; border-color:#f8b4b2; }
+
+/* Table card */
+.table-card{
+  border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#fff;
+}
+.nice-table{ width:100%; border-collapse:collapse; }
+.nice-table thead th{
+  background:#f8fbff; color:var(--navy); font-weight:700; text-align:left;
+  padding:14px; letter-spacing:.02em;
+}
+.nice-table tbody td{
+  padding:14px; border-top:1px solid #eef2f8; color:#243b55;
+}
+.row-actions{ display:flex; gap:8px; }
+
+/* Pager like "Page 1 / N" */
+.pager{
+  display:flex; gap:12px; align-items:center; justify-content:flex-end; padding:12px;
+}
+
+/* Grid utilities used by the Sound component */
+.grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+
+/* Messages under the form */
+.form-msg.ok{ color:#127c39; font-weight:600; }
+.form-msg.err{ color:#b42318; font-weight:600; }
+
+/* Responsive tweaks */
+@media (max-width: 860px){
+  .grid-2{ grid-template-columns:1fr; }
+  .grid-3{ grid-template-columns:1fr; }
+}
+
+/* Dark mode for this block */
+[data-theme="dark"] .card-surface{
+  background: linear-gradient(180deg, #0b1220, #0d1628);
+  border-color: rgba(255,210,63,.15);
+  box-shadow: 0 12px 40px rgba(0,0,0,.35);
+}
+[data-theme="dark"] .card-surface .title{ color: var(--navy); }
+[data-theme="dark"] .card-surface .search-input{
+  background: var(--gray-100); border-color: var(--gray-300); color: var(--text);
+}
+[data-theme="dark"] .table-card{
+  background:#0b1220; border-color: var(--gray-200);
+}
+[data-theme="dark"] .nice-table thead th{
+  background:#0e1628; color:#dbe7ff;
+}
+[data-theme="dark"] .nice-table tbody td{
+  border-top-color:#15223a; color: var(--text);
+}
+[data-theme="dark"] .card-surface .btn{
+  background: var(--gray-100); border-color: var(--gray-300); color: var(--text);
+}
+[data-theme="dark"] .card-surface .btn-primary{ background: var(--gold); color:#0a2c56; }
+[data-theme="dark"] .card-surface .btn-accent{ background:#5a4b1a; color:#ffe9a6; }
