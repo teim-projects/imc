@@ -10,7 +10,7 @@ const PHOTO_FIELD_NAME = "photo"; // 🔁 must match your Django field (e.g., "p
 
 const Register = () => {
   const navigate = useNavigate();
-  const REGISTER_URL = `${import.meta.env.VITE_BASE_API_URL}/api/auth/dj-rest-auth/registration/`;
+  const REGISTER_URL = `${import.meta.env.VITE_BASE_API_URL}/auth/dj-rest-auth/registration/`;
 
   const [form, setForm] = useState({ email: "", mobile_no: "", password1: "", password2: "" });
   const [touched, setTouched] = useState({});
@@ -264,7 +264,7 @@ const Register = () => {
           <div style={styles.dividerRow}><span style={styles.dots} /><span style={styles.muted}>Or continue with</span><span style={styles.dots} /></div>
 
           <div style={{ width: "100%", marginTop: 8 }}>
-            <GoogleAuthButton endpoint="/api/auth/auth/google/" onSuccessNavigate="/dashboard" />
+            <GoogleAuthButton endpoint="/auth/auth/google/" onSuccessNavigate="/dashboard" />
           </div>
 
           {message && <p style={styles.message}>{message}</p>}

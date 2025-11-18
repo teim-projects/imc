@@ -4,6 +4,7 @@ import Sidebar from "./Sidebar";
 import Charts from "./Charts";
 
 import StudioForm from "./Forms/StudioForm";
+import StudioMasterForm from "./Forms/StudioMasterForm"; // ⬅️ NEW
 import EquipmentForm from "./Forms/EquipmentForm";
 import EventsForm from "./Forms/EventsForm";
 import ShowsForm from "./Forms/ShowsForm";
@@ -26,7 +27,9 @@ import "./Dashboard.css";
 ---------------------------------------------------- */
 const ALLOWED_KEYS = new Set([
   null,
-  "studio", "equipment", "events", "photography", "videography", "sound", "singer", "payment", "user", "private",
+  // top-level modules
+  "studio", "studioMaster", "equipment", "events", "photography", "videography", "sound", "singer", "payment", "user", "private",
+  // sub-actions used by Sidebar
   "addStudio", "viewStudio",
   "addEquipment", "viewEquipment",
   "addEvent", "viewEvent",
@@ -34,35 +37,65 @@ const ALLOWED_KEYS = new Set([
   "addPrivate", "viewPrivate",
   "addPhotography", "viewPhotography",
   "addVideography", "viewVideography",
+  "addSound", "viewSound",
+  "addSinger", "viewSinger",
+  "addPayment", "viewPayment",
+  "addUser", "viewUser",
+  // Studio Master sub-actions
+  "addStudioMaster", "viewStudioMaster",
 ]);
 
 const prettyTitle = (k) => {
   if (!k) return "Overview";
   const map = {
     studio: "Studio",
+    studioMaster: "Studio Master",
     equipment: "Equipment",
     events: "Events",
     photography: "Photography",
     videography: "Videography",
-    sound: "Sound System Service", // updated label
+    sound: "Sound System Service",
     singer: "Singer",
     payment: "Payment",
     user: "Users",
     private: "Private Bookings",
+
     addStudio: "Add Studio Booking",
     viewStudio: "View Studio Bookings",
+
     addEquipment: "Add Equipment",
     viewEquipment: "View Equipment",
+
     addEvent: "Add Event",
     viewEvent: "View Events",
+
     addShow: "Add Show",
     viewShow: "View Shows",
+
     addPrivate: "Add Private Booking",
     viewPrivate: "View Private Bookings",
+
     addPhotography: "Add Photography Booking",
     viewPhotography: "View Photography Bookings",
+
     addVideography: "Add Videography Booking",
     viewVideography: "View Videography Bookings",
+
+    addSound: "Add Sound Job",
+    viewSound: "View Sound Jobs",
+
+    addSinger: "Add Singer",
+    viewSinger: "View Singers",
+
+    addPayment: "Add Payment",
+    viewPayment: "View Payments",
+
+    addUser: "Add User",
+    viewUser: "View Users",
+
+    // Studio Master sub-actions
+    addStudioMaster: "Add Studio (Master)",
+    viewStudioMaster: "View Studios (Master)",
   };
   return map[k] ?? "Overview";
 };
@@ -110,37 +143,65 @@ export default function Dashboard() {
   // Render whichever module is active
   const renderActive = () => {
     switch (activeForm) {
+      // Top-level opens
       case "studio":          return <StudioForm onClose={closeForm} />;
+      case "studioMaster":    return <StudioMasterForm defaultTab="ADD" />; // ⬅️ NEW top-level
       case "equipment":       return <EquipmentForm onClose={closeForm} />;
       case "events":          return <EventsForm onClose={closeForm} />;
       case "photography":     return <PhotographyForm onClose={closeForm} />;
       case "videography":     return <VideographyForm onClose={closeForm} />;
-      case "sound":           return <SoundSystemService />; // no onClose; it has its own ADD/VIEW
+      case "sound":           return <SoundSystemService />; // full page with its own tabs
       case "singer":          return <SingerForm onClose={closeForm} />;
       case "payment":         return <PaymentForm onClose={closeForm} />;
       case "user":            return <UserForm onClose={closeForm} />;
       case "private":         return <PrivateBookingForm onClose={closeForm} />;
 
+      // Studio Bookings
       case "addStudio":       return <StudioForm onClose={closeForm} viewOnly={false} />;
       case "viewStudio":      return <StudioForm onClose={closeForm} viewOnly />;
 
+      // Studio Master sub-actions
+      case "addStudioMaster":  return <StudioMasterForm defaultTab="ADD" />;
+      case "viewStudioMaster": return <StudioMasterForm defaultTab="VIEW" />;
+
+      // Equipment
       case "addEquipment":    return <EquipmentForm onClose={closeForm} viewOnly={false} />;
       case "viewEquipment":   return <EquipmentForm onClose={closeForm} viewOnly />;
 
+      // Events
       case "addEvent":        return <EventsForm onClose={closeForm} defaultTab={defaultTabFor("addEvent")} />;
       case "viewEvent":       return <EventsForm onClose={closeForm} defaultTab={defaultTabFor("viewEvent")} />;
 
+      // Shows
       case "addShow":         return <ShowsForm onClose={closeForm} defaultTab={defaultTabFor("addShow")} />;
       case "viewShow":        return <ShowsForm onClose={closeForm} defaultTab={defaultTabFor("viewShow")} />;
 
+      // Private bookings
       case "addPrivate":      return <PrivateBookingForm onClose={closeForm} viewOnly={false} />;
       case "viewPrivate":     return <PrivateBookingForm onClose={closeForm} viewOnly />;
 
+      // Photography
       case "addPhotography":  return <PhotographyForm onClose={closeForm} viewOnly={false} />;
       case "viewPhotography": return <PhotographyForm onClose={closeForm} viewOnly />;
 
+      // Videography
       case "addVideography":  return <VideographyForm onClose={closeForm} viewOnly={false} />;
       case "viewVideography": return <VideographyForm onClose={closeForm} viewOnly />;
+
+      // Sound submenu → direct tab
+      case "addSound":        return <SoundSystemService defaultTab="ADD" />;
+      case "viewSound":       return <SoundSystemService defaultTab="VIEW" />;
+
+      // Singer / Payment / User submenu handling
+      case "addSinger":       return <SingerForm onClose={closeForm} viewOnly={false} />;
+      case "viewSinger":      return <SingerForm onClose={closeForm} viewOnly />;
+
+      case "addPayment":      return <PaymentForm onClose={closeForm} viewOnly={false} />;
+      case "viewPayment":     return <PaymentForm onClose={closeForm} viewOnly />;
+
+      case "addUser":         return <UserForm onClose={closeForm} viewOnly={false} />;
+      case "viewUser":        return <UserForm onClose={closeForm} viewOnly />;
+
       default:                return null;
     }
   };
@@ -177,7 +238,7 @@ export default function Dashboard() {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.96 }}
                       className="neo-cta"
-                      onClick={() => safeSetActiveForm("events")}
+                      onClick={() => safeSetActiveForm("addEvent")}
                     >
                       + Add New Event
                     </motion.button>

@@ -19,9 +19,18 @@ from dj_rest_auth.registration.serializers import RegisterSerializer
 from dj_rest_auth.serializers import LoginSerializer, UserDetailsSerializer
 
 from .models import (
-    Studio, Event, Show, Payment, Videography, CustomUser,
-    Equipment, EquipmentRental, EquipmentEntry, PrivateBooking,
-    PhotographyBooking, Sound,   # <-- use Sound (not SoundSetup)
+    # Core / Users
+    CustomUser,
+    # Studio master + bookings
+    StudioMaster, Studio,
+    # CRM modules
+    PrivateBooking,
+    PhotographyBooking,
+    Event, Show, Payment, Videography,
+    # Equipment
+    Equipment, EquipmentRental, EquipmentEntry,
+    # Sound service
+    Sound,
 )
 
 # ---------------------------------------------------------------------
@@ -61,7 +70,130 @@ def _ensure_hms(t: str) -> str:
 
 
 # ---------------------------------------------------------------------
-# Studio
+# Studio Master (catalog)
+# ---------------------------------------------------------------------
+# api/serializers.py
+# api/serializers.py
+from decimal import Decimal, InvalidOperation
+from rest_framework import serializers
+from .models import StudioMaster, StudioImage
+
+class StudioImageSerializer(serializers.ModelSerializer):
+    # Provide full absolute URL for the frontend
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudioImage
+        fields = ["id", "url", "caption", "is_primary", "uploaded_at"]
+        read_only_fields = ["id", "url", "uploaded_at"]
+
+    def get_url(self, obj):
+        request = self.context.get("request")
+        if not obj.image:
+            return None
+        try:
+            path = obj.image.url
+        except ValueError:
+            return None
+        if request:
+            return request.build_absolute_uri(path)
+        return path
+
+
+class StudioMasterSerializer(serializers.ModelSerializer):
+    full_location = serializers.ReadOnlyField()
+    images = StudioImageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = StudioMaster
+        fields = [
+            "id",
+            "name",
+            "location",
+            "area",
+            "city",
+            "state",
+            "full_location",
+            "google_map_link",
+            "capacity",
+            "size_sq_ft",
+            "hourly_rate",
+            "is_active",
+            "images",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ("id", "created_at", "updated_at", "full_location", "images")
+
+    def validate_name(self, v):
+        v = (v or "").strip()
+        if not v:
+            raise serializers.ValidationError("Studio name is required.")
+        return v
+
+    def validate_capacity(self, v):
+        if v is None:
+            return v
+        try:
+            if int(v) < 0:
+                raise serializers.ValidationError("Capacity must be 0 or greater.")
+        except (TypeError, ValueError):
+            raise serializers.ValidationError("Capacity must be an integer.")
+        return v
+
+    def validate_size_sq_ft(self, v):
+        if v in (None, ""):
+            return v
+        s = str(v).strip().replace(",", "")
+        try:
+            Decimal(s)
+        except (InvalidOperation, ValueError):
+            raise serializers.ValidationError("Size (sq ft) must be numeric (e.g. 1200).")
+        return str(v).strip()
+
+    def validate_hourly_rate(self, v):
+        if v in (None, ""):
+            return v
+        try:
+            dec = Decimal(v)
+        except (InvalidOperation, TypeError, ValueError):
+            raise serializers.ValidationError("Hourly rate must be a valid number.")
+        if dec < 0:
+            raise serializers.ValidationError("Hourly rate cannot be negative.")
+        return dec
+
+    def validate_google_map_link(self, v):
+        if not v:
+            return v
+        v = v.strip()
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise serializers.ValidationError("Google map link must start with http:// or https://")
+        return v
+
+    def create(self, validated_data):
+        hr = validated_data.get("hourly_rate")
+        if hr is not None and not isinstance(hr, Decimal):
+            try:
+                validated_data["hourly_rate"] = Decimal(str(hr))
+            except (InvalidOperation, TypeError, ValueError):
+                validated_data["hourly_rate"] = Decimal("0.00")
+        if "size_sq_ft" in validated_data and validated_data["size_sq_ft"] is not None:
+            validated_data["size_sq_ft"] = str(validated_data["size_sq_ft"]).strip()
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        hr = validated_data.get("hourly_rate")
+        if hr is not None and not isinstance(hr, Decimal):
+            try:
+                validated_data["hourly_rate"] = Decimal(str(hr))
+            except (InvalidOperation, TypeError, ValueError):
+                validated_data["hourly_rate"] = instance.hourly_rate or Decimal("0.00")
+        if "size_sq_ft" in validated_data and validated_data["size_sq_ft"] is not None:
+            validated_data["size_sq_ft"] = str(validated_data["size_sq_ft"]).strip()
+        return super().update(instance, validated_data)
+
+# ---------------------------------------------------------------------
+# Studio Booking
 # ---------------------------------------------------------------------
 class StudioSerializer(serializers.ModelSerializer):
     # Expose payment_methods as a list to the UI
@@ -119,8 +251,7 @@ class StudioSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        # expects `payment_list` property on model (already present)
-        rep["payment_methods"] = instance.payment_list
+        rep["payment_methods"] = instance.payment_list  # uses model property
         return rep
 
 
@@ -166,7 +297,6 @@ class PrivateBookingSerializer(serializers.ModelSerializer):
 # Photography: Booking (OLD field names to match your DB)
 # ---------------------------------------------------------------------
 class PhotographyBookingSerializer(serializers.ModelSerializer):
-    # UI aliases and single-select payment
     payment_methods_list = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
 
     class Meta:
@@ -366,6 +496,7 @@ class CustomRegisterSerializer(RegisterSerializer):
             raise serializers.ValidationError({"mobile_no": ["This mobile number is already registered."]})
         return user
 
+
 class CustomLoginSerializer(LoginSerializer):
     username = None
     email_or_mobile = serializers.CharField(required=True)
@@ -397,6 +528,7 @@ class CustomLoginSerializer(LoginSerializer):
 
         attrs['user'] = user
         return attrs
+
 
 class CustomUserDetailsSerializer(UserDetailsSerializer):
     profile_photo = serializers.ImageField(read_only=True, use_url=True, allow_null=True, required=False)
@@ -445,6 +577,7 @@ class PasswordResetRequestSerializer(serializers.Serializer):
         email.send()
 
         return {"detail": "Password reset email sent successfully."}
+
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     uidb64 = serializers.CharField()
@@ -531,7 +664,7 @@ class EquipmentSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-    read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["created_at", "updated_at"]
 
     def validate_quantity_in_stock(self, value):
         if value is not None and value < 0:
@@ -582,14 +715,8 @@ class EquipmentRentalSerializer(serializers.ModelSerializer):
 
 
 # ---------------------------------------------------------------------
-# Sound System (Service) – matches Sound model
+# Sound System (Service)
 # ---------------------------------------------------------------------
-# api/serializers.py
-from decimal import Decimal
-from rest_framework import serializers
-from .models import Sound
-import re
-
 class SoundSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sound
@@ -606,6 +733,7 @@ class SoundSerializer(serializers.ModelSerializer):
             "payment_method": {"required": False},  # model default is "Cash"
         }
 
+    # --- small helpers ---
     def _blank_to_none(self, v):
         return None if (isinstance(v, str) and v.strip() == "") else v
 
@@ -615,7 +743,7 @@ class SoundSerializer(serializers.ModelSerializer):
         try:
             return int(v)
         except Exception:
-            return 0  # TEMP: coerce invalid to 0
+            return 0  # permissive: coerce invalid to 0
 
     def _to_decimal_or_zero(self, v):
         if v in (None, "", "null"):
@@ -623,7 +751,7 @@ class SoundSerializer(serializers.ModelSerializer):
         try:
             return Decimal(str(v))
         except Exception:
-            return Decimal("0")  # TEMP: coerce invalid to 0
+            return Decimal("0")  # permissive
 
     def to_internal_value(self, data):
         d = data.copy()
@@ -647,7 +775,7 @@ class SoundSerializer(serializers.ModelSerializer):
         d["microphones_count"] = self._to_int_or_zero(d.get("microphones_count"))
         d["price"] = self._to_decimal_or_zero(d.get("price"))
 
-        # Payment choice
+        # Payment choice (normalize)
         pm = (d.get("payment_method") or "").strip().lower()
         d["payment_method"] = {"upi": "UPI", "card": "Card", "cash": "Cash"}.get(pm, "Cash")
 
@@ -657,10 +785,52 @@ class SoundSerializer(serializers.ModelSerializer):
 
         return super().to_internal_value(d)
 
-    # Keep validation extremely permissive for now
+    # keep validation permissive
     def validate_mobile_no(self, v):
         if v in (None, ""):
             return v
         if not re.fullmatch(r"\+?\d{7,15}", str(v).strip()):
-            return ""  # TEMP: drop invalid mobile instead of erroring
+            return ""  # drop invalid mobile instead of erroring (permissive)
         return v
+
+
+
+
+
+# ---------------------------------------------------------------------
+# Singer Master (Service)
+# ---------------------------------------------------------------------
+
+
+# api/serializers.py
+# api/serializers.py
+from rest_framework import serializers
+from .models import Singer   # ← Import the actual model
+
+
+class SingerSerializer(serializers.ModelSerializer):
+    mobile_number = serializers.CharField(source="mobile", required=False, allow_blank=True)
+    is_active = serializers.BooleanField(source="active", required=False)
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Singer   # ← Use the imported model, NOT string!
+        fields = [
+            "id", "name", "birth_date", "mobile", "mobile_number",
+            "profession", "education", "achievement", "favourite_singer",
+            "reference_by", "genre", "experience", "area", "city", "state",
+            "rate", "gender", "active", "is_active", "photo", "photo_url",
+            "created_at", "updated_at"
+        ]
+        read_only_fields = ("id", "created_at", "updated_at", "photo_url")
+        extra_kwargs = {
+            "photo": {"required": False, "allow_null": True},
+        }
+
+    def get_photo_url(self, obj):
+        if not obj.photo:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.photo.url)
+        return obj.photo.url

@@ -10,8 +10,9 @@ import "./Forms.css";
  *   (If your API uses PATCH, change axios.put -> axios.patch)
  */
 
-const API_URL = "http://127.0.0.1:8000/auth/equipment/";
-const PAGE_SIZE = 10;
+const BASE = import.meta?.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
+const API_URL = `${BASE}/auth/equipment/`;        // ✅ fixed `/api`
+const PAGE_SIZE = 10;                                  // ✅ added
 
 /* =========================
    Helpers: adapters for API
@@ -279,7 +280,7 @@ const EquipmentForm = ({ onClose, viewOnly = false }) => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); /* eslint-disable-next-line */ }, []);
 
   // Delete
   const handleDelete = async (id) => {

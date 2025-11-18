@@ -36,17 +36,31 @@ except Exception:
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
-    Studio, PrivateBooking, Event, Show, Payment, Videography,
-    Equipment, EquipmentRental, EquipmentEntry, PhotographyBooking,
-    Sound,   # <-- use Sound model
+    # Studio
+    StudioMaster, Studio,
+    # CRM modules
+    PrivateBooking, Event, Show, Payment, Videography,
+    # Equipment
+    Equipment, EquipmentRental, EquipmentEntry,
+    # Photography (old schema)
+    PhotographyBooking,
+    # Sound service
+    Sound,
 )
 
 from .serializers import (
-    StudioSerializer, PrivateBookingSerializer,
-    EventSerializer, ShowSerializer, PaymentSerializer, VideographySerializer,
+    # Studio
+    StudioMasterSerializer, StudioSerializer,
+    # CRM modules
+    PrivateBookingSerializer, EventSerializer, ShowSerializer, PaymentSerializer, VideographySerializer,
+    # Auth helpers
     PasswordResetRequestSerializer, PasswordResetConfirmSerializer,
+    # Equipment
     EquipmentSerializer, EquipmentRentalSerializer, EquipmentEntrySerializer,
-    PhotographyBookingSerializer, SoundSerializer,  # <-- use SoundSerializer
+    # Photography (old schema)
+    PhotographyBookingSerializer,
+    # Sound service
+    SoundSerializer,
 )
 
 User = get_user_model()
@@ -142,7 +156,125 @@ class PasswordResetConfirmView(APIView):
 
 
 # ====================================================================
-# Studios
+# Studio Master (catalog)
+# ====================================================================
+# api/views.py
+# api/views.py
+from django.db import transaction
+from rest_framework import viewsets, filters, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
+
+from .models import StudioMaster, StudioImage
+from .serializers import StudioMasterSerializer, StudioImageSerializer
+from .permissions import IsStaffOrRoleAdmin
+
+class DefaultPagination(PageNumberPagination):
+    page_size = 12
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
+class StudioMasterViewSet(viewsets.ModelViewSet):
+    # Prefetch images so serializer returns them in list endpoints
+    queryset = StudioMaster.objects.all().order_by("name").prefetch_related("images")
+    serializer_class = StudioMasterSerializer
+
+    # Choose permission:
+    # - For dev/user-created studios: IsAuthenticatedOrReadOnly
+    # - For admin-only writes use IsStaffOrRoleAdmin
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    pagination_class = DefaultPagination
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "location", "area", "city", "state"]
+    ordering_fields = ["name", "capacity", "hourly_rate", "updated_at", "created_at"]
+    ordering = ["name"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        is_active = self.request.query_params.get("is_active")
+        city = self.request.query_params.get("city")
+        if is_active is not None:
+            if is_active.lower() in ("1", "true", "yes"):
+                qs = qs.filter(is_active=True)
+            elif is_active.lower() in ("0", "false", "no"):
+                qs = qs.filter(is_active=False)
+        if city:
+            qs = qs.filter(city__iexact=city)
+        return qs
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        name = (serializer.validated_data.get("name") or "").strip()
+        location = serializer.validated_data.get("location", "") or ""
+        serializer.save(name=name, location=location)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        name = (serializer.validated_data.get("name") or "").strip()
+        location = serializer.validated_data.get("location", "") or ""
+        serializer.save(name=name, location=location)
+
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
+    def toggle_active(self, request, pk=None):
+        instance = self.get_object()
+        instance.is_active = not instance.is_active
+        instance.save(update_fields=["is_active", "updated_at"])
+        return Response({"id": instance.id, "is_active": instance.is_active}, status=status.HTTP_200_OK)
+
+
+class StudioImageUploadView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, studio_pk, *args, **kwargs):
+        try:
+            studio = StudioMaster.objects.get(pk=studio_pk)
+        except StudioMaster.DoesNotExist:
+            return Response({"detail": "Studio not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        files = request.FILES.getlist("images")
+        if not files:
+            return Response({"detail": "No files uploaded. Use field 'images'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        created_objs = []
+        for f in files:
+            si = StudioImage.objects.create(studio=studio, image=f)
+            created_objs.append(si)
+
+        serializer = StudioImageSerializer(created_objs, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, studio_pk, image_pk=None, *args, **kwargs):
+        if image_pk is None:
+            return Response({"detail": "Image id required in URL."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            img = StudioImage.objects.get(pk=image_pk, studio_id=studio_pk)
+        except StudioImage.DoesNotExist:
+            return Response({"detail": "Image not found."}, status=status.HTTP_404_NOT_FOUND)
+        img.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class WhoAmI(APIView):
+    permission_classes = [IsAuthenticated]
+    def get(self, request):
+        u = request.user
+        return Response({
+            "id": getattr(u, "id", None),
+            "email": getattr(u, "email", None),
+            "mobile_no": getattr(u, "mobile_no", None),
+            "is_staff": getattr(u, "is_staff", False),
+            "is_superuser": getattr(u, "is_superuser", False),
+            "role": getattr(u, "role", None),
+        })
+
+
+# ====================================================================
+# Studios (bookings)
 # ====================================================================
 class StudioViewSet(viewsets.ModelViewSet):
     queryset = Studio.objects.all()
@@ -286,9 +418,9 @@ class PhotographyBookingViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     parser_classes = [parsers.JSONParser, parsers.FormParser]  # no uploads
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["client","email","contact_number","event_type","package_type","location","notes"]
-    ordering_fields = ["date","created_at","price","photographers_count","videographers_count"]
-    ordering = ["-date","-created_at"]
+    search_fields = ["client", "email", "contact_number", "event_type", "package_type", "location", "notes"]
+    ordering_fields = ["date", "created_at", "price", "photographers_count", "videographers_count"]
+    ordering = ["-date", "-created_at"]
 
     @action(detail=False, methods=["get"])
     def today(self, request):
@@ -329,7 +461,10 @@ class VideographyViewSet(viewsets.ModelViewSet):
     serializer_class = VideographySerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
+    # search + ordering
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+
+    # search across common text fields
     search_fields = [
         "client_name",
         "project",
@@ -341,6 +476,8 @@ class VideographyViewSet(viewsets.ModelViewSet):
         "payment_method",
         "notes",
     ]
+
+    # allow UI to sort by these columns
     ordering_fields = [
         "created_at",
         "updated_at",
@@ -352,6 +489,8 @@ class VideographyViewSet(viewsets.ModelViewSet):
         "package_type",
         "payment_method",
     ]
+
+    # default table order
     ordering = ["-created_at"]
 
 
@@ -455,17 +594,17 @@ class EquipmentEntryViewSet(viewsets.ModelViewSet):
 
 
 # ====================================================================
-# Sound System (Service)  — NEW
+# Sound System (Service)
 # ====================================================================
-# api/views.py
-from rest_framework import parsers
-
 class SoundViewSet(viewsets.ModelViewSet):
+    """
+    /api/auth/sound/
+    """
     queryset = Sound.objects.all().order_by("-event_date", "-created_at")
     serializer_class = SoundSerializer
     pagination_class = DefaultPagination
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
-    parser_classes = [parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser]  # ✅ add this
+    parser_classes = [parsers.JSONParser, parsers.FormParser, parsers.MultiPartParser]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = [
         "client_name", "email", "mobile_no",
@@ -476,3 +615,36 @@ class SoundViewSet(viewsets.ModelViewSet):
         "speakers_count", "microphones_count", "system_type"
     ]
     ordering = ["-event_date", "-created_at"]
+
+    @action(detail=False, methods=["get"])
+    def today(self, request):
+        """Quick filter for today's sound jobs."""
+        qs = self.get_queryset().filter(event_date=now().date())
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(qs, many=True).data)
+
+
+
+
+
+
+# ====================================================================
+# Singer Master (Service)
+# ====================================================================
+
+from rest_framework import viewsets, permissions
+from .models import Singer
+from .serializers import SingerSerializer
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+class SingerViewSet(viewsets.ModelViewSet):
+    queryset = Singer.objects.all()
+    serializer_class = SingerSerializer
+    permission_classes = [permissions.IsAuthenticated]  # adjust as needed
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+
+
+
