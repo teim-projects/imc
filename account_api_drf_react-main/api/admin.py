@@ -456,3 +456,6 @@ class CustomUserAdmin(UserAdmin):
     )
 
     filter_horizontal = ("groups", "user_permissions")
+
+
+

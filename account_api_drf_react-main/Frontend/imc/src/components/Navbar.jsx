@@ -57,7 +57,7 @@ const Navbar = () => {
       return;
     }
     try {
-      const res = await fetch(`${BASE}/api/auth/dj-rest-auth/user/`, {
+      const res = await fetch(`${BASE}/auth/dj-rest-auth/user/`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -123,7 +123,7 @@ const Navbar = () => {
       {/* LOGO + TITLE */}
       <div style={styles.logo}>
         <Link
-          to="/dashboard"
+          to="#"
           style={{ display: "flex", alignItems: "center", textDecoration: "none", color: "white" }}
         >
           <img src={logo} alt="IMC Logo" style={styles.logoImg} />

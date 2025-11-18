@@ -3,36 +3,26 @@ import { useNavigate } from "react-router-dom";
 
 const ProfileSection = () => {
   const navigate = useNavigate();
-  const BASE = useMemo(() => import.meta.env.VITE_BASE_API_URL?.replace(/\/+$/, "") || "", []);
+  const BASE = useMemo(() => (import.meta.env.VITE_BASE_API_URL || "").replace(/\/+$/, ""), []);
 
   // ------------ state ------------
   const [user, setUser] = useState({
     full_name: "",
     email: "",
     mobile_no: "",
-    profile_photo: "", // URL or path from server
+    profile_photo: "",
   });
 
-  const [avatarFile, setAvatarFile] = useState(null);     // <File>
-  const [avatarPreview, setAvatarPreview] = useState(""); // blob URL
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState(null);           // {type, text}
-  const [errors, setErrors] = useState({});               // field-level errors from client/server
+  const [message, setMessage] = useState(null);
+  const [errors, setErrors] = useState({});
 
   // ------------ helpers ------------
   const notify = (type, text) => setMessage({ type, text });
   const clearMessage = () => setMessage(null);
-
-  const validate = () => {
-    const e = {};
-    if (!user.full_name.trim()) e.full_name = "Full name is required.";
-    if (user.mobile_no && !/^\+?\d{7,15}$/.test(user.mobile_no.trim())) {
-      e.mobile_no = "Enter a valid phone (7–15 digits, optional +).";
-    }
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
 
   const bearer = () => {
     const token = localStorage.getItem("access");
@@ -43,9 +33,25 @@ const ProfileSection = () => {
     if (!maybeUrl) return "";
     const s = String(maybeUrl);
     if (/^https?:\/\//i.test(s)) return s;
-    // handle "/media/..." or "media/..."
     if (s.startsWith("/")) return `${BASE}${s}`;
     return `${BASE}/${s}`;
+  };
+
+  const splitName = (full) => {
+    const s = (full || "").trim().replace(/\s+/g, " ");
+    if (!s) return { first_name: "", last_name: "" };
+    const parts = s.split(" ");
+    return { first_name: parts.shift() || "", last_name: parts.join(" ") };
+  };
+
+  const validateLocal = () => {
+    const e = {};
+    if (!user.full_name.trim()) e.full_name = "Full name is required.";
+    if (user.mobile_no && !/^\+?\d{7,15}$/.test(user.mobile_no.trim())) {
+      e.mobile_no = "Enter a valid phone (7–15 digits, optional +).";
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   // ------------ fetch user ------------
@@ -60,26 +66,27 @@ const ProfileSection = () => {
     setErrors({});
 
     try {
-      const res = await fetch(`${BASE}/api/auth/dj-rest-auth/user/`, {
+      const res = await fetch(`${BASE}/auth/dj-rest-auth/user/`, {
         method: "GET",
         headers: { "Content-Type": "application/json", ...bearer() },
       });
 
       if (res.status === 401) {
-        // expired/invalid token
         localStorage.removeItem("access");
         localStorage.removeItem("refresh");
         navigate("/login", { replace: true });
         return;
       }
-      if (!res.ok) throw new Error("Failed to load.");
+      if (!res.ok) throw new Error("Failed to load profile.");
 
       const data = await res.json();
+      const full = data.full_name || `${data.first_name || ""} ${data.last_name || ""}`.trim();
+
       setUser({
-        full_name: data.full_name || `${(data.first_name || "")} ${(data.last_name || "")}`.trim(),
+        full_name: full,
         email: data.email || "",
-        mobile_no: data.mobile_no || "",
-        profile_photo: data.profile_photo || data.photo || "", // tolerate alternate field name
+        mobile_no: data.mobile_no || "",                    // will persist only if backend allows it
+        profile_photo: data.profile_photo || data.photo || "",
       });
     } catch (err) {
       console.error("Fetch user error:", err);
@@ -93,13 +100,12 @@ const ProfileSection = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     clearMessage();
-    setErrors((e) => ({ ...e, api: null }));
+    setErrors((x) => ({ ...x, api: null }));
 
-    if (!validate()) {
+    if (!validateLocal()) {
       notify("error", "Please fix validation errors.");
       return;
     }
-
     const token = localStorage.getItem("access");
     if (!token) {
       navigate("/login", { replace: true });
@@ -108,26 +114,34 @@ const ProfileSection = () => {
 
     setSaving(true);
     try {
+      const { first_name, last_name } = splitName(user.full_name);
       let res, data;
+
       if (avatarFile) {
         const formData = new FormData();
-        formData.append("full_name", user.full_name || "");
-        formData.append("mobile_no", user.mobile_no || "");
-        formData.append("profile_photo", avatarFile); // 🔁 rename if backend uses another name
+        formData.append("first_name", first_name);
+        formData.append("last_name", last_name);
 
-        res = await fetch(`${BASE}/api/auth/dj-rest-auth/user/`, {
+        // send both keys; backend will accept whichever is wired
+        formData.append("photo", avatarFile);
+        formData.append("profile_photo", avatarFile);
+
+        // optional: include mobile_no only if your serializer allows it
+        if (user.mobile_no?.trim()) formData.append("mobile_no", user.mobile_no.trim());
+
+        res = await fetch(`${BASE}/auth/dj-rest-auth/user/`, {
           method: "PATCH",
-          headers: { ...bearer() }, // do NOT set Content-Type for FormData
+          headers: { ...bearer() }, // don't set Content-Type for FormData
           body: formData,
         });
       } else {
-        res = await fetch(`${BASE}/api/auth/dj-rest-auth/user/`, {
+        const payload = { first_name, last_name };
+        if (user.mobile_no?.trim()) payload.mobile_no = user.mobile_no.trim();
+
+        res = await fetch(`${BASE}/auth/dj-rest-auth/user/`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", ...bearer() },
-          body: JSON.stringify({
-            full_name: user.full_name,
-            mobile_no: user.mobile_no,
-          }),
+          body: JSON.stringify(payload),
         });
       }
 
@@ -141,7 +155,6 @@ const ProfileSection = () => {
       }
 
       if (!res.ok) {
-        // Map DRF field errors: {mobile_no:["..."], profile_photo:["..."], detail:"..."}
         const fieldErrs = {};
         if (data && typeof data === "object") {
           for (const [k, v] of Object.entries(data)) {
@@ -154,18 +167,22 @@ const ProfileSection = () => {
         return;
       }
 
-      // success
+      const fullNew = data.full_name || `${data.first_name || ""} ${data.last_name || ""}`.trim();
+      const newPhoto = data.profile_photo || data.photo || user.profile_photo;
+
       setUser((prev) => ({
         ...prev,
-        full_name: data.full_name ?? prev.full_name,
+        full_name: fullNew || prev.full_name,
         mobile_no: data.mobile_no ?? prev.mobile_no,
-        profile_photo: data.profile_photo ?? data.photo ?? prev.profile_photo,
+        profile_photo: newPhoto,
       }));
-      // refresh preview to the just-uploaded one (cache-bust)
-      if (data.profile_photo || data.photo) {
-        setAvatarPreview(""); // drop blob
+
+      if (avatarFile) {
         setAvatarFile(null);
+        if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+        setAvatarPreview(""); // we’ll show the server image with cache-bust below
       }
+
       notify("success", "Profile updated successfully!");
     } catch (err) {
       console.error("Update error:", err);
@@ -175,7 +192,7 @@ const ProfileSection = () => {
     }
   };
 
-  // ------------ avatar ------------
+  // ------------ avatar handlers ------------
   const onAvatarChange = (file) => {
     if (!file) return;
     if (!/^image\//.test(file.type)) {
@@ -196,9 +213,6 @@ const ProfileSection = () => {
     setAvatarFile(null);
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     setAvatarPreview("");
-    // Note: this removes local selection only.
-    // To delete on server, add a separate PATCH that sends {"profile_photo": null}
-    // and support it in your serializer.
   };
 
   // ------------ logout ------------
@@ -215,7 +229,6 @@ const ProfileSection = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ------------ UI ------------
   if (loading) {
     return (
       <div style={sx.shell}>
@@ -237,9 +250,10 @@ const ProfileSection = () => {
     );
   }
 
+  // Show blob preview if selected; otherwise server image with cache-bust
   const avatarSrc =
     avatarPreview ||
-    (user.profile_photo ? toAbsolute(user.profile_photo) : "");
+    (user.profile_photo ? `${toAbsolute(user.profile_photo)}?t=${Date.now()}` : "");
 
   return (
     <div style={sx.shell}>
@@ -259,10 +273,7 @@ const ProfileSection = () => {
 
         {/* Toast */}
         {message && (
-          <div
-            role="alert"
-            style={{ ...sx.toast, ...(message.type === "success" ? sx.toastSuccess : sx.toastError) }}
-          >
+          <div role="alert" style={{ ...sx.toast, ...(message.type === "success" ? sx.toastSuccess : sx.toastError) }}>
             {message.text}
             <button onClick={clearMessage} style={sx.toastClose} aria-label="Close">×</button>
           </div>
@@ -444,7 +455,7 @@ const sx = {
   },
 };
 
-// skeleton keyframes
+// skeleton keyframes (once)
 if (typeof document !== "undefined" && !document.getElementById("sk-anim")) {
   const style = document.createElement("style");
   style.id = "sk-anim";

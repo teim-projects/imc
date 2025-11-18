@@ -9,7 +9,7 @@ import GoogleAuthButton from "./GoogleAuthButton";
 export default function Login() {
   const navigate = useNavigate();
   const BASE_API = import.meta.env.VITE_BASE_API_URL;
-  const LOGIN_ENDPOINT = `${BASE_API}/api/auth/dj-rest-auth/login/`;
+  const LOGIN_ENDPOINT = `${BASE_API}/auth/dj-rest-auth/login/`;
 
   const [form, setForm] = useState({ email_or_mobile: "", password: "", remember: false });
   const [loading, setLoading] = useState(false);
@@ -116,7 +116,7 @@ export default function Login() {
           </div>
 
           {/* Google OAuth button (reusable) */}
-          <GoogleAuthButton endpoint="/api/auth/auth/google/" onSuccessNavigate="/dashboard" />
+          <GoogleAuthButton endpoint="/auth/google/" onSuccessNavigate="/dashboard" />
 
           {message && <p style={styles.message}>{message}</p>}
         </form>

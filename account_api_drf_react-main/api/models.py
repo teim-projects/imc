@@ -1,13 +1,11 @@
 # api/models.py
 from decimal import Decimal
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
-
 
 # ============================================================
 # ===============  UTIL / LEGACY MIGRATION HOOK  =============
@@ -19,6 +17,11 @@ def upload_image_to(instance, filename):
     api.models.upload_image_to continue to work.
     """
     return f"uploads/{filename}"
+
+def user_profile_path(instance, filename):
+    # e.g. media/profiles/42/avatar.png
+    uid = instance.pk or "tmp"
+    return f"profiles/{uid}/{filename}"
 
 
 # ============================================================
@@ -67,7 +70,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default="customer")
-    profile_photo = models.ImageField(upload_to="profiles/", blank=True, null=True)
+
+    # Use a deterministic folder per user
+    profile_photo = models.ImageField(upload_to=user_profile_path, blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -83,7 +88,76 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
 
 # ============================================================
-# ===================== STUDIO MODEL =========================
+# ===================== STUDIO MASTER ========================
+# ============================================================
+# api/models.py
+# api/models.py
+from decimal import Decimal
+from django.db import models
+
+def studio_image_path(instance, filename):
+    sid = getattr(instance.studio, "id", "tmp")
+    return f"uploads/studios/{sid}/{filename}"
+
+class StudioMaster(models.Model):
+    name = models.CharField(max_length=120, unique=True)
+    location = models.CharField(max_length=160, blank=True)
+    area = models.CharField(max_length=160, blank=True, help_text="Area / locality (e.g., Andheri East)")
+    city = models.CharField(max_length=120, blank=True, help_text="City (e.g., Mumbai)")
+    state = models.CharField(max_length=120, blank=True, help_text="State (e.g., Maharashtra)")
+    google_map_link = models.URLField(max_length=500, blank=True, help_text="Optional Google Maps URL")
+    capacity = models.PositiveIntegerField(blank=True, null=True, help_text="Number of people the studio can hold")
+    size_sq_ft = models.CharField(max_length=40, blank=True, help_text="Studio size in square feet (e.g., 1200). Stored as text")
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+        indexes = [
+            models.Index(fields=["name"]),
+            models.Index(fields=["is_active"]),
+            models.Index(fields=["city"]),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def full_location(self):
+        parts = []
+        if self.area:
+            parts.append(self.area)
+        if self.city:
+            parts.append(self.city)
+        if self.state:
+            parts.append(self.state)
+        if parts:
+            return ", ".join(parts)
+        return self.location or ""
+
+
+class StudioImage(models.Model):
+    studio = models.ForeignKey(StudioMaster, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to=studio_image_path)
+    caption = models.CharField(max_length=200, blank=True)
+    is_primary = models.BooleanField(default=False)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-is_primary", "-uploaded_at"]
+        indexes = [
+            models.Index(fields=["studio"]),
+            models.Index(fields=["is_primary"]),
+        ]
+
+    def __str__(self):
+        return f"Image {self.pk} for studio {getattr(self.studio, 'id', '?')}"
+
+
+# ============================================================
+# ===================== STUDIO BOOKING =======================
 # ============================================================
 
 class Studio(models.Model):
@@ -93,7 +167,7 @@ class Studio(models.Model):
     email = models.EmailField(blank=True, null=True)
     address = models.TextField(blank=True, null=True)
 
-    # Studio Rental
+    # Studio Rental (kept as a plain name to preserve old data)
     studio_name = models.CharField(max_length=100)
     date = models.DateField()
     time_slot = models.TimeField(blank=True, null=True)  # "HH:MM" accepted
@@ -126,10 +200,76 @@ class Studio(models.Model):
                 name="uniq_studio_date_timeslot",
             ),
         ]
-    indexes = [
-        models.Index(fields=["date", "time_slot"]),
-        models.Index(fields=["studio_name"]),
-    ]
+        indexes = [
+            models.Index(fields=["date", "time_slot"]),
+            models.Index(fields=["studio_name"]),
+        ]
+
+    def __str__(self):
+        return f"{self.studio_name} | {self.customer} | {self.date}"
+
+    @property
+    def payment_list(self):
+        if not self.payment_methods:
+            return []
+        s = (self.payment_methods or "").strip()
+        if not s:
+            return []
+        if "," not in s:
+            return [s]
+        return [x.strip() for x in s.split(",") if x.strip()]
+
+
+
+
+# ============================================================
+# ===================== STUDIO BOOKING =======================
+# ============================================================
+
+class Studio(models.Model):
+    # Customer Info
+    customer = models.CharField(max_length=100)
+    contact_number = models.CharField(max_length=15, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+
+    # Studio Rental (kept as a plain name to preserve old data)
+    studio_name = models.CharField(max_length=100)
+    date = models.DateField()
+    time_slot = models.TimeField(blank=True, null=True)  # "HH:MM" accepted
+    duration = models.DecimalField(
+        max_digits=4,
+        decimal_places=1,
+        validators=[MinValueValidator(Decimal("0.5"))],
+        help_text="Duration in hours",
+    )
+
+    # Payment Options (CSV; API can expose list)
+    payment_methods = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Comma-separated: Card, UPI, NetBanking",
+    )
+
+    # Meta
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Studio Booking"
+        verbose_name_plural = "Studio Bookings"
+        ordering = ["-date", "-time_slot"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["studio_name", "date", "time_slot"],
+                name="uniq_studio_date_timeslot",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["date", "time_slot"]),
+            models.Index(fields=["studio_name"]),
+        ]
 
     def __str__(self):
         return f"{self.studio_name} | {self.customer} | {self.date}"
@@ -518,7 +658,7 @@ class EquipmentEntry(models.Model):
 
     # Meta
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now_add=False, auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -566,9 +706,106 @@ class Sound(models.Model):
     def __str__(self):
         return f"{self.client_name} - {self.system_type or 'Sound'}"
 
-
-# ------------------------------------------------------------
-# Temporary alias so legacy imports like `from api.models import SoundSetup`
-# don't crash while you update admin/serializers/views. Remove later.
-# ------------------------------------------------------------
+# Temporary alias for legacy imports
 SoundSetup = Sound
+
+
+
+
+
+# ===============================================
+# ============  Singer (SERVICE)  =========
+# ===============================================
+
+# api/models.py
+import os
+import uuid
+from django.db import models
+from django.utils.deconstruct import deconstructible
+
+def singer_upload_to(instance, filename):
+    """Primary upload function — places files under media/singers/<uuid>.<ext>."""
+    ext = filename.split('.')[-1] if '.' in filename else 'jpg'
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    return os.path.join("singers", filename)
+
+# keep backward-compatible name used by older migrations
+def singer_photo_upload_to(instance, filename):
+    return singer_upload_to(instance, filename)
+
+
+class Singer(models.Model):
+    GENDER_CHOICES = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    )
+
+    name = models.CharField(max_length=255)
+    genre = models.CharField(max_length=120, blank=True, null=True)
+    experience = models.PositiveIntegerField(default=0)
+    area = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=120, blank=True, null=True)
+    state = models.CharField(max_length=120, blank=True, null=True)
+    rate = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
+    mobile = models.CharField(max_length=32, blank=True, null=True)
+    active = models.BooleanField(default=True)
+    photo = models.ImageField(upload_to=singer_photo_upload_to, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-id',)
+        verbose_name = "Singer"
+        verbose_name_plural = "Singers"
+
+    def __str__(self):
+        return self.name or f"Singer {self.pk}"
+
+
+
+
+
+
+# # api/models.py
+# api/models.py
+from django.db import models
+
+
+class Singer(models.Model):
+    name = models.CharField(max_length=255)
+    birth_date = models.DateField(null=True, blank=True)
+    mobile = models.CharField(max_length=20, blank=True, default="")
+    profession = models.CharField(max_length=200, blank=True, default="")
+    education = models.CharField(max_length=300, blank=True, default="")
+    achievement = models.TextField(blank=True, default="")
+    favourite_singer = models.CharField(max_length=200, blank=True, default="")
+    reference_by = models.CharField(max_length=200, blank=True, default="")
+    genre = models.CharField(max_length=100, blank=True, default="")
+    experience = models.PositiveIntegerField(null=True, blank=True)
+    
+    area = models.CharField(max_length=200, blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="")
+    state = models.CharField(max_length=100, blank=True, default="")
+    
+    rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    gender = models.CharField(
+        max_length=10,
+        choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
+        blank=True,
+        default=""
+    )
+    active = models.BooleanField(default=True)
+    photo = models.ImageField(upload_to='singers/', null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name_plural = "Singers"
+
+    def __str__(self):
+        return self.name
