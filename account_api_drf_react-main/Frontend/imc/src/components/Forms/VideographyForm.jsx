@@ -274,7 +274,7 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
           </div>
 
           <div className="group">
-            <label>Project *</label>
+            <label>Event Name *</label>
             <input
               name="project"
               value={formData.project}

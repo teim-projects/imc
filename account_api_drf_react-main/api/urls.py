@@ -1,8 +1,12 @@
 # api/urls.py
+from django import views
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from .views import DashboardSummary
+from .views import SingingClassAdmissionViewSet
+
 
 from .views import (
     # Auth helpers
@@ -20,7 +24,7 @@ from .views import (
     # Equipment
     EquipmentViewSet, EquipmentRentalViewSet, EquipmentEntryViewSet,
 
-    StudioMasterViewSet, StudioImageUploadView, SingerViewSet,
+    StudioMasterViewSet, StudioImageUploadView, SingerViewSet, SingingClassAdmissionViewSet,
 )
 
 router = DefaultRouter()
@@ -68,6 +72,9 @@ router.register(r"auth/equipment", EquipmentEntryViewSet, basename="auth-equipme
 router.register(r"singers", SingerViewSet, basename="singer")
 
 
+router.register(r"singing-classes", SingingClassAdmissionViewSet, basename="singingclass")
+
+
 urlpatterns = [
     path("", include(router.urls)),
 
@@ -83,6 +90,8 @@ urlpatterns = [
     path("password-reset-confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("studio-master/<int:studio_pk>/images/", StudioImageUploadView.as_view(), name="studio-image-upload"),
     path("studio-master/<int:studio_pk>/images/<int:image_pk>/", StudioImageUploadView.as_view(), name="studio-image-delete"),
+    path("dashboard/", DashboardSummary.as_view(), name="dashboard_summary"),
+    
     
 ]
 

@@ -809,3 +809,39 @@ class Singer(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+
+
+
+    # api/models.py
+from django.db import models
+
+class SingingClass(models.Model):
+    BATCHES = [
+        ("Morning (7:00 - 9:00)", "Morning (7:00 - 9:00)"),
+        ("Afternoon (1:00 - 3:00)", "Afternoon (1:00 - 3:00)"),
+        ("Evening (6:00 - 8:00)", "Evening (6:00 - 8:00)"),
+    ]
+
+    first_name = models.CharField(max_length=80)
+    last_name = models.CharField(max_length=80)
+    phone = models.CharField(max_length=40)
+    email = models.EmailField()
+    address1 = models.CharField(max_length=255)
+    address2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=120)
+    state = models.CharField(max_length=120)
+    postal_code = models.CharField(max_length=20)
+    preferred_batch = models.CharField(max_length=50, choices=BATCHES)
+    reference_by = models.CharField(max_length=120, blank=True, null=True)
+    agreed_terms = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.phone})"

@@ -66,6 +66,7 @@ INSTALLED_APPS = [
 
     # My apps
     'api',
+    "User_Dashboard", 
 ] 
 
 SITE_ID = 1

@@ -647,4 +647,239 @@ class SingerViewSet(viewsets.ModelViewSet):
 
 
 
+# api/views.py (replace or add)
+import logging
+from importlib import import_module
 
+from django.apps import apps
+from django.db.models import Sum
+from django.utils import timezone
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+
+logger = logging.getLogger(__name__)
+
+def get_model_safely(app_label, model_name):
+    """
+    Return the model class or None. Use apps.get_model which reads installed apps.
+    """
+    try:
+        return apps.get_model(app_label, model_name)
+    except Exception:
+        return None
+
+def first_existing_attr(obj, candidates, default=None):
+    for c in candidates:
+        if hasattr(obj, c):
+            return c
+    return default
+
+class DashboardSummary(APIView):
+    """
+    Safer dashboard summary. On error it logs full exception and returns a helpful message
+    (this helps you see what's wrong while debugging).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def _safe_count(self, Model):
+        try:
+            return Model.objects.count()
+        except Exception as e:
+            logger.exception("Count failed for %s", Model)
+            return 0
+
+    def _safe_sum(self, Model, field_names):
+        """
+        Try to sum the first matching field name in field_names.
+        Returns float total or 0.0 on error.
+        """
+        for fld in field_names:
+            try:
+                agg = Model.objects.aggregate(total=Sum(fld))
+                if agg and agg.get("total") is not None:
+                    return float(agg["total"])
+            except Exception:
+                # try next candidate field
+                logger.debug("Sum candidate '%s' not usable for %s", fld, Model)
+                continue
+        return 0.0
+
+    def _gather_recent(self, Model, type_name, date_fields, price_fields, customer_fields):
+        """
+        Return list of dicts for recent items from Model. Try common fields for date/price/customer.
+        """
+        out = []
+        try:
+            # determine which date field exists
+            sample = Model.objects.first()
+            if not sample:
+                return out
+            date_field = first_existing_attr(sample, date_fields)
+            price_field = first_existing_attr(sample, price_fields)
+            customer_field = first_existing_attr(sample, customer_fields)
+
+            qs = Model.objects.all().order_by(f"-{date_field or 'pk'}")[:8]
+            for obj in qs:
+                date_val = getattr(obj, date_field) if date_field else None
+                price_val = getattr(obj, price_field) if price_field else None
+                cust_val = getattr(obj, customer_field) if customer_field else None
+
+                # customer text
+                cust_text = "—"
+                try:
+                    if cust_val:
+                        if hasattr(cust_val, "email"):
+                            cust_text = getattr(cust_val, "email")
+                        elif hasattr(cust_val, "first_name"):
+                            cust_text = f"{getattr(cust_val,'first_name','')} {getattr(cust_val,'last_name','')}".strip()
+                        else:
+                            cust_text = str(cust_val)
+                except Exception:
+                    cust_text = "—"
+
+                out.append({
+                    "type": type_name,
+                    "id": getattr(obj, "id", None),
+                    "date": date_val.isoformat() if date_val is not None else None,
+                    "price": float(price_val) if price_val is not None else None,
+                    "customer": cust_text,
+                })
+        except Exception:
+            logger.exception("Failed to gather recent items for %s", Model)
+        return out
+
+    def get(self, request):
+        try:
+            # common models and app label guesses (adjust 'api' if your app label differs)
+            APP = "api"
+
+            CustomUser = get_model_safely(APP, "CustomUser") or get_model_safely("auth", "User")
+            Studio = get_model_safely(APP, "Studio")
+            PrivateBooking = get_model_safely(APP, "PrivateBooking")
+            PhotographyBooking = get_model_safely(APP, "PhotographyBooking")
+            Videography = get_model_safely(APP, "Videography")
+            Event = get_model_safely(APP, "Event")
+            Show = get_model_safely(APP, "Show")
+            Payment = get_model_safely(APP, "Payment")
+
+            # customers
+            customers = 0
+            if CustomUser:
+                try:
+                    customers = CustomUser.objects.filter(is_active=True).count()
+                except Exception:
+                    # fallback to counting all rows
+                    customers = self._safe_count(CustomUser)
+
+            # bookings total (sum counts)
+            bookings = 0
+            for M in (Studio, PrivateBooking, PhotographyBooking, Videography):
+                if M:
+                    bookings += self._safe_count(M)
+
+            # events
+            events = 0
+            for M in (Event, Show):
+                if M:
+                    events += self._safe_count(M)
+
+            # revenue: try common field names on Payment: amount, total, price
+            revenue = 0.0
+            if Payment:
+                revenue = self._safe_sum(Payment, ["amount", "total", "price", "paid_amount"])
+
+            # collect recent bookings from available tables
+            recent = []
+            # common date and price candidates to attempt
+            date_candidates = ["date", "created_at", "shoot_date", "event_date", "booking_date"]
+            price_candidates = ["price", "amount", "total", "paid_amount"]
+            customer_candidates = ["customer", "client", "client_name", "customer_name", "user"]
+
+            for Model, name in ((PrivateBooking, "PrivateBooking"),
+                                (PhotographyBooking, "PhotographyBooking"),
+                                (Videography, "Videography"),
+                                (Studio, "Studio")):
+                if Model:
+                    recent.extend(self._gather_recent(Model, name, date_candidates, price_candidates, customer_candidates))
+
+            # sort recent by date (descending) and keep top 6
+            recent_sorted = sorted([r for r in recent if r.get("date")], key=lambda x: x["date"], reverse=True)[:6]
+
+            payload = {
+                "customers": customers,
+                "bookings": bookings,
+                "events": events,
+                "revenue": revenue,
+                "recent_bookings": recent_sorted,
+                "generated_at": timezone.now().isoformat(),
+            }
+            return Response(payload)
+        except Exception as exc:
+            # Log full exception server-side for debugging
+            logger.exception("DashboardSummary failed")
+            # Return the error back in the response to help debugging (remove in production)
+            return Response({
+                "detail": "Failed to compute dashboard summary",
+                "error": str(exc)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+
+
+# api/views.py
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from .models import SingingClass
+from .serializers import SingingClassSerializer
+
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Allow safe methods to anyone, but write/update/delete only to staff/superuser.
+    (Adjust to your auth requirements.)
+    """
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return bool(request.user and request.user.is_staff)
+
+class SingingClassAdmissionViewSet(viewsets.ModelViewSet):
+    """
+    Standard CRUD for SingingClass.
+    - list: GET /auth/singing-classes/
+    - create: POST /auth/singing-classes/
+    - retrieve/update/destroy: /auth/singing-classes/<pk>/
+    """
+    queryset = SingingClass.objects.all().order_by("-created_at")
+    serializer_class = SingingClassSerializer
+    permission_classes = [permissions.AllowAny]  # allow public creation; change to IsAuthenticated if needed
+
+    # Example extra action to update status (only for staff)
+    @action(detail=True, methods=["patch"], permission_classes=[permissions.IsAdminUser])
+    def status(self, request, pk=None):
+        """
+        PATCH /auth/singing-classes/<pk>/status/
+        payload: { "status": "confirmed" }
+        """
+        sc = get_object_or_404(SingingClass, pk=pk)
+        new_status = request.data.get("status")
+        if not new_status:
+            return Response({"detail": "Missing 'status' field."}, status=status.HTTP_400_BAD_REQUEST)
+        allowed = {"pending", "confirmed", "cancelled"}
+        if new_status not in allowed:
+            return Response({"detail": f"Invalid status. Allowed: {', '.join(allowed)}"}, status=status.HTTP_400_BAD_REQUEST)
+        sc.status = new_status
+        sc.save()
+        return Response({"id": sc.id, "status": sc.status}, status=status.HTTP_200_OK)
+
+    def perform_create(self, serializer):
+        # Optionally attach authenticated user if you have user field; not used here
+        serializer.save()
