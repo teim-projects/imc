@@ -1,54 +1,60 @@
-// src/components/Forms/VideographyForm.jsx
+// src/userDashboard/Forms/UserPhotographyBookingForm.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import "./Forms.css";
+
 
 /**
- * VideographyForm:
- * ✅ Add / View tabs
- * ✅ Search + pagination
- * ✅ Payment Method as tag buttons
- * ✅ Event Type dropdown with "Other" → extra name field
+ * UserPhotographyBookingForm – user-facing:
+ * - Uses /user/photography-bookings/ endpoint
+ * - Matches PhotographyBooking model fields
+ * - Keeps your advanced UI (tabs + table)
  */
 
-const BASE_API = import.meta.env.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const CANDIDATE_API_URLS = [
-  `${BASE_API}/auth/videography/`,
-  `${BASE_API}/videography/`,
-  `${BASE_API}//videography-bookings/`,
-];
+const BASE_API =
+  import.meta.env.VITE_BASE_API_URL || "http://127.0.0.1:8000";
+
+const API_URL = `${BASE_API}/user/photography-bookings/`;
 const PAGE_SIZE = 10;
 
-// Event types for dropdown
-const eventTypes = [
-  "theatre music events",
-  "private music events",
-  "Birthday",
-  "Other",
-];
-
+// Form state (aligned with backend model)
 const initialForm = {
-  client_name: "",
+  full_name: "",
   email: "",
-  mobile_no: "",
-  project: "", // Event / project name
-  editor: "",
-  shoot_date: "",
+  phone: "",
+  event_type: "Wedding",
+  event_type_other: "",
+  event_date: "",
   start_time: "",
   duration_hours: 2,
-  location: "",
-  event_type: "",        // dropdown
-  other_event_name: "",  // shown only when event_type === "Other"
+  location_venue: "",
+  city: "",
   package_type: "Standard",
-  package_price: "",
-  payment_method: "Cash",
+  num_photographers: 1,
+  need_videography: false,
+  need_album: false,
+  need_drone: false,
+  budget_range: "",
   notes: "",
+  payment_method: "",
+
+  // UI-only extras (merged into notes on submit)
+  addon_name: "",
+  addon_price: "",
 };
 
-const packageOptions = ["Standard", "Premium", "Custom"];
 const methodOptions = ["Cash", "Card", "UPI"];
+const eventTypes = [
+  "Wedding",
+  "Pre-wedding",
+  "Birthday",
+  "Corporate",
+  "Portfolio",
+  "Family",
+  "Other",
+];
+const packages = ["Standard", "Premium", "Custom"];
 
-const VideographyForm = ({ onClose, viewOnly = false }) => {
+const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
   const [tab, setTab] = useState(viewOnly ? "VIEW" : "ADD");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -61,9 +67,6 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const [resolvedURL, setResolvedURL] = useState(CANDIDATE_API_URLS[0]);
-  const [urlChecked, setUrlChecked] = useState(false);
-
   const token = useMemo(() => localStorage.getItem("access"), []);
   const headers = useMemo(
     () => ({
@@ -73,44 +76,20 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
     [token]
   );
 
-  // ---------- Resolve endpoint once ----------
-  const resolveApiUrl = async () => {
-    for (const u of CANDIDATE_API_URLS) {
-      try {
-        const r = await axios.get(u, { headers });
-        if (r.status === 200) {
-          setResolvedURL(u);
-          setUrlChecked(true);
-          return;
-        }
-      } catch (_) {
-        // try next
-      }
-    }
-    setUrlChecked(true);
-  };
-
-  useEffect(() => {
-    resolveApiUrl();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ---------- Fetch ----------
+  // ---------- Fetch all bookings for this user ----------
   const fetchRows = async () => {
-    if (!urlChecked) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.get(resolvedURL, { headers });
+      const res = await axios.get(API_URL, { headers });
       const data = Array.isArray(res.data) ? res.data : res.data?.results || [];
       setRows(data);
     } catch (err) {
+      console.error("Photography bookings fetch error:", err);
       setError(
-        err?.response?.status === 404
-          ? `404: ${resolvedURL} not found. Check backend router (api/urls.py).`
-          : err?.response?.data?.detail ||
-              err?.message ||
-              "Failed to load videography bookings."
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Failed to load photography bookings."
       );
     } finally {
       setLoading(false);
@@ -118,18 +97,19 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
   };
 
   useEffect(() => {
-    if (tab === "VIEW" && urlChecked) fetchRows();
-  }, [tab, urlChecked, resolvedURL]);
+    if (tab === "VIEW") fetchRows();
+  }, [tab]);
 
   // ---------- Handlers ----------
   const onChange = (e) => {
-    const { name, value, type } = e.target;
+    const { name, value, type, checked } = e.target;
     setForm((s) => ({
       ...s,
-      [name]: type === "number" ? (value === "" ? "" : Number(value)) : value,
+      [name]: type === "checkbox" ? !!checked : value,
     }));
   };
 
+  // Single payment method selection
   const toggleMethod = (m) => {
     setForm((s) => ({
       ...s,
@@ -138,41 +118,52 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
   };
 
   const validate = () => {
-    if (!form.project?.trim()) return "Project / Event name is required.";
-    if (!form.editor?.trim()) return "Editor is required.";
-    if (!form.shoot_date) return "Shoot date is required.";
-
-    const d = Number(form.duration_hours);
-    if (Number.isNaN(d) || d <= 0) return "Duration (hours) must be greater than 0.";
-
+    if (!form.full_name?.trim()) return "Client name is required.";
+    if (!form.phone?.trim()) return "Mobile number is required.";
+    if (!form.event_date) return "Event date is required.";
+    if (!form.start_time) return "Start time is required.";
+    if (!form.location_venue?.trim()) return "Location is required.";
     if (!form.payment_method) return "Select a payment method.";
 
-    // Extra validation for "Other" type
-    if (form.event_type === "Other") {
-      if (!form.other_event_name.trim()) {
-        return "Please enter event name for 'Other' type.";
-      }
+    if (form.event_type === "Other" && !form.event_type_other.trim()) {
+      return 'Please specify "Other" event type.';
     }
-
     return null;
   };
 
+  // Build payload matching PhotographyBooking model
   const buildPayload = () => {
-    // ✅ send event_type & other_event_name to backend (model has fields)
     const payload = {
-      ...form,
-      duration_hours: Number(form.duration_hours) || 0,
-      start_time: form.start_time || null,
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      event_type:
+        form.event_type === "Other" && form.event_type_other
+          ? form.event_type_other
+          : form.event_type,
+      event_date: form.event_date,
+      start_time: form.start_time,
+      duration_hours: form.duration_hours,
+      location_venue: form.location_venue,
+      city: form.city,
+      package_type: form.package_type,
+      num_photographers: form.num_photographers,
+      need_videography: form.need_videography,
+      need_album: form.need_album,
+      need_drone: form.need_drone,
+      budget_range: form.budget_range,
+      notes: form.notes,
+      payment_method: form.payment_method,
     };
 
-    // If not "Other", clear the other_event_name
-    if (payload.event_type !== "Other") {
-      payload.other_event_name = "";
-    }
-
-    // If event_type empty, also clear other_event_name
-    if (!payload.event_type) {
-      payload.other_event_name = "";
+    // Merge addon info into notes (so backend doesn’t need extra fields)
+    if (form.addon_name || form.addon_price) {
+      const addonText = `Add-on: ${form.addon_name || ""} ${
+        form.addon_price ? `(₹${form.addon_price})` : ""
+      }`.trim();
+      payload.notes = payload.notes
+        ? `${payload.notes}\n${addonText}`
+        : addonText;
     }
 
     return payload;
@@ -193,22 +184,23 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
     try {
       const payload = buildPayload();
       if (editingId) {
-        await axios.put(`${resolvedURL}${editingId}/`, payload, { headers });
-        setSuccessMsg("Videography booking updated.");
+        await axios.put(`${API_URL}${editingId}/`, payload, { headers });
+        setSuccessMsg("Booking updated.");
       } else {
-        await axios.post(resolvedURL, payload, { headers });
-        setSuccessMsg("Videography booking created.");
+        await axios.post(API_URL, payload, { headers });
+        setSuccessMsg("Booking created.");
       }
       resetForm();
       if (tab === "VIEW") fetchRows();
       else setTab("VIEW");
     } catch (err) {
+      console.error("Photography booking save error:", err);
       setError(
-        err?.response?.status === 404
-          ? `404: ${resolvedURL} not found. Backend route missing.`
-          : typeof err?.response?.data === "object"
+        typeof err?.response?.data === "object"
           ? JSON.stringify(err.response.data)
-          : err?.response?.data?.detail || err?.message || "Failed to save booking."
+          : err?.response?.data?.detail ||
+              err?.message ||
+              "Failed to save booking."
       );
     } finally {
       setSaving(false);
@@ -222,57 +214,54 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
 
     setForm({
       ...initialForm,
-      client_name: row.client_name || row.client || "",
+      full_name: row.full_name || "",
       email: row.email || "",
-      mobile_no: row.mobile_no || row.contact_number || "",
-      project: row.project || "",
-      editor: row.editor || "",
-      shoot_date: row.shoot_date || row.date || "",
+      phone: row.phone || "",
+      event_type: row.event_type || "Wedding",
+      event_type_other: "", // cannot know original "Other" vs predefined
+      event_date: row.event_date || "",
       start_time: row.start_time || "",
       duration_hours: row.duration_hours ?? 2,
-      location: row.location || "",
-      // ✅ load from backend
-      event_type: row.event_type || "",
-      other_event_name: row.other_event_name || "",
+      location_venue: row.location_venue || "",
+      city: row.city || "",
       package_type: row.package_type || "Standard",
-      package_price: row.package_price || "",
-      payment_method: row.payment_method || "Cash",
+      num_photographers: row.num_photographers ?? 1,
+      need_videography: !!row.need_videography,
+      need_album: !!row.need_album,
+      need_drone: !!row.need_drone,
+      budget_range: row.budget_range || "",
       notes: row.notes || "",
+      payment_method: row.payment_method || "",
+      addon_name: "",
+      addon_price: "",
     });
   };
 
   const onDelete = async (row) => {
-    if (
-      !confirm(
-        `Delete videography booking for ${
-          row.project || row.client_name || "this client"
-        }?`
-      )
-    )
-      return;
+    if (!confirm(`Delete booking for ${row.full_name}?`)) return;
     try {
-      await axios.delete(`${resolvedURL}${row.id}/`, { headers });
+      await axios.delete(`${API_URL}${row.id}/`, { headers });
       setRows((s) => s.filter((r) => r.id !== row.id));
     } catch (err) {
+      console.error("Delete error:", err);
       setError(
         err?.response?.status === 404
-          ? `404: ${resolvedURL}${row.id}/ not found.`
+          ? `404: ${API_URL}${row.id}/ not found.`
           : err?.response?.data?.detail || "Delete failed."
       );
     }
   };
 
+  // Search + pagination
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return rows;
     return rows.filter((r) => {
-      const hay = `${r.project || ""} ${r.editor || ""} ${
-        r.client_name || r.client || ""
-      } ${r.email || ""} ${r.mobile_no || r.contact_number || ""} ${
-        r.location || ""
-      } ${r.package_type || ""} ${r.payment_method || ""} ${r.notes || ""} ${
+      const hay = `${r.full_name || ""} ${r.phone || ""} ${r.email || ""} ${
         r.event_type || ""
-      } ${r.other_event_name || ""}`
+      } ${r.location_venue || ""} ${r.city || ""} ${r.package_type || ""} ${
+        r.budget_range || ""
+      } ${r.notes || ""}`
         .toLowerCase()
         .trim();
       return hay.includes(q);
@@ -289,22 +278,16 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
     if (page > totalPages) setPage(1);
   }, [totalPages, page]);
 
-  // helper to display event type nicely
-  const renderEventTypeCell = (row) => {
-    if (!row.event_type) return "-";
-    if (row.event_type === "Other") {
-      return row.other_event_name
-        ? `Other – ${row.other_event_name}`
-        : "Other";
-    }
-    return row.event_type;
-  };
+  // For table display
+  const displayEvent = (r) => r.event_type || "-";
+
+  const displayPayment = (r) => r.payment_method || "-";
 
   // ---------- UI ----------
   return (
     <div className="pf-wrap">
       <div className="pf-header">
-        <h2>Videography Service</h2>
+        <h2>Photography Service</h2>
         <div className="pf-tabs">
           <button
             className={tab === "ADD" ? "active" : ""}
@@ -324,28 +307,30 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
       {error && <div className="pf-banner pf-error">{error}</div>}
       {successMsg && <div className="pf-banner pf-success">{successMsg}</div>}
 
+      {/* ADD / EDIT FORM */}
       {tab === "ADD" && (
         <form className="pf-form" onSubmit={onSubmit}>
-          {/* CLIENT & PROJECT */}
           <section className="pf-card">
-            <h3>Client & Project</h3>
+            <h3>Client & Event</h3>
             <div className="pf-grid">
               <label>
-                Client Name
+                Client Name*
                 <input
-                  name="client_name"
-                  value={form.client_name}
+                  name="full_name"
+                  value={form.full_name}
                   onChange={onChange}
                   placeholder="Full name"
+                  required
                 />
               </label>
               <label>
-                Mobile
+                Mobile*
                 <input
-                  name="mobile_no"
-                  value={form.mobile_no}
+                  name="phone"
+                  value={form.phone}
                   onChange={onChange}
                   placeholder="98765 43210"
+                  required
                 />
               </label>
               <label>
@@ -360,39 +345,15 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
               </label>
 
               <label>
-                Project / Event Name*
-                <input
-                  name="project"
-                  value={form.project}
-                  onChange={onChange}
-                  placeholder="Wedding film, music video..."
-                  required
-                />
-              </label>
-
-              <label>
-                Editor*
-                <input
-                  name="editor"
-                  value={form.editor}
-                  onChange={onChange}
-                  placeholder="Editor name"
-                  required
-                />
-              </label>
-
-              {/* EVENT TYPE + OTHER NAME */}
-              <label>
                 Event Type
                 <select
                   name="event_type"
                   value={form.event_type}
                   onChange={onChange}
                 >
-                  <option value="">Select event type</option>
-                  {eventTypes.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {eventTypes.map((e) => (
+                    <option key={e} value={e}>
+                      {e}
                     </option>
                   ))}
                 </select>
@@ -400,12 +361,12 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
 
               {form.event_type === "Other" && (
                 <label>
-                  Other Event Name*
+                  Other Event Type
                   <input
-                    name="other_event_name"
-                    value={form.other_event_name}
+                    name="event_type_other"
+                    value={form.event_type_other}
                     onChange={onChange}
-                    placeholder="e.g. Corporate launch, TV promo..."
+                    placeholder="Describe event"
                   />
                 </label>
               )}
@@ -417,7 +378,7 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
                   value={form.package_type}
                   onChange={onChange}
                 >
-                  {packageOptions.map((p) => (
+                  {packages.map((p) => (
                     <option key={p} value={p}>
                       {p}
                     </option>
@@ -426,69 +387,152 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
               </label>
 
               <label>
-                Package Price (₹)
+                Budget Range (₹)
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  name="package_price"
-                  value={form.package_price}
+                  name="budget_range"
+                  value={form.budget_range}
                   onChange={onChange}
-                  placeholder="e.g. 20000"
+                  placeholder="e.g. ₹20,000 – ₹40,000"
                 />
               </label>
             </div>
           </section>
 
-          {/* SCHEDULE */}
           <section className="pf-card">
-            <h3>Schedule</h3>
+            <h3>Schedule & Location</h3>
             <div className="pf-grid">
               <label>
-                Shoot Date*
+                Event Date*
                 <input
                   type="date"
-                  name="shoot_date"
-                  value={form.shoot_date}
+                  name="event_date"
+                  value={form.event_date}
                   onChange={onChange}
                   required
                 />
               </label>
               <label>
-                Start Time
+                Start Time*
                 <input
                   type="time"
                   name="start_time"
                   value={form.start_time}
                   onChange={onChange}
-                />
-              </label>
-              <label>
-                Duration (hours)*
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  name="duration_hours"
-                  value={form.duration_hours}
-                  onChange={onChange}
-                  placeholder="e.g. 2"
                   required
                 />
               </label>
               <label>
-                Location
+                Duration (hours)
                 <input
-                  name="location"
-                  value={form.location}
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  name="duration_hours"
+                  value={form.duration_hours}
                   onChange={onChange}
-                  placeholder="Studio / On-location"
+                />
+              </label>
+              <label>
+                Location (Venue)*
+                <input
+                  name="location_venue"
+                  value={form.location_venue}
+                  onChange={onChange}
+                  placeholder="Venue / Address"
+                  required
+                />
+              </label>
+              <label>
+                City
+                <input
+                  name="city"
+                  value={form.city}
+                  onChange={onChange}
+                  placeholder="e.g. Jaipur"
+                />
+              </label>
+              <label>
+                Number of photographers
+                <input
+                  type="number"
+                  min="1"
+                  name="num_photographers"
+                  value={form.num_photographers}
+                  onChange={onChange}
                 />
               </label>
             </div>
           </section>
 
-          {/* PAYMENT */}
+          <section className="pf-card">
+            <h3>Requirements & Add-ons</h3>
+            <div className="pf-grid">
+              <label className="pf-checkbox">
+                <input
+                  type="checkbox"
+                  name="need_videography"
+                  checked={form.need_videography}
+                  onChange={onChange}
+                />
+                <span>Also need videography</span>
+              </label>
+              <label className="pf-checkbox">
+                <input
+                  type="checkbox"
+                  name="need_album"
+                  checked={form.need_album}
+                  onChange={onChange}
+                />
+                <span>Printed album</span>
+              </label>
+              <label className="pf-checkbox">
+                <input
+                  type="checkbox"
+                  name="need_drone"
+                  checked={form.need_drone}
+                  onChange={onChange}
+                />
+                <span>Drone coverage</span>
+              </label>
+            </div>
+
+            <div className="pf-grid">
+              <label>
+                Add-on Name (optional)
+                <input
+                  name="addon_name"
+                  value={form.addon_name}
+                  onChange={onChange}
+                  placeholder="e.g. Extra album, reels, drone..."
+                />
+              </label>
+              <label>
+                Add-on Price (₹)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  name="addon_price"
+                  value={form.addon_price}
+                  onChange={onChange}
+                  placeholder="e.g. 3000"
+                />
+              </label>
+            </div>
+
+            <label>
+              Extra details / notes
+              <textarea
+                name="notes"
+                rows={3}
+                value={form.notes}
+                onChange={onChange}
+                placeholder="Important moments to cover, specific shots, references, etc."
+              />
+            </label>
+          </section>
+
+          {/* Payment Method */}
           <section className="pf-card">
             <h3>Payment Method</h3>
             <div className="pf-methods">
@@ -497,7 +541,9 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
                   <button
                     type="button"
                     key={m}
-                    className={form.payment_method === m ? "tag active" : "tag"}
+                    className={
+                      form.payment_method === m ? "tag active" : "tag"
+                    }
                     onClick={() => toggleMethod(m)}
                   >
                     {m}
@@ -507,22 +553,6 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
             </div>
           </section>
 
-          {/* NOTES */}
-          <section className="pf-card">
-            <h3>Notes</h3>
-            <div className="pf-grid">
-              <label className="pf-notes-label">
-                <textarea
-                  name="notes"
-                  value={form.notes}
-                  onChange={onChange}
-                  placeholder="Any special requirements, deliverables, style preferences..."
-                />
-              </label>
-            </div>
-          </section>
-
-          {/* ACTIONS */}
           <div className="pf-actions">
             <button className="btn" disabled={saving}>
               {editingId
@@ -561,7 +591,7 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
           <div className="pf-table-top">
             <input
               className="pf-search"
-              placeholder="Search project, editor, client, email, phone, location, event type..."
+              placeholder="Search client, phone, email, event, location, package..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -574,13 +604,12 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
             <table className="pf-table">
               <thead>
                 <tr>
-                  <th>Project</th>
-                  <th>Event Type</th>
-                  <th>Editor</th>
                   <th>Client</th>
+                  <th>Event</th>
                   <th>Date</th>
-                  <th>Duration</th>
+                  <th>Location</th>
                   <th>Package</th>
+                  <th>Budget</th>
                   <th>Payment</th>
                   <th className="c">Actions</th>
                 </tr>
@@ -588,17 +617,13 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
               <tbody>
                 {pageRows.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.project || "-"}</td>
-                    <td>{renderEventTypeCell(r)}</td>
-                    <td>{r.editor || "-"}</td>
-                    <td>{r.client_name || r.client || "-"}</td>
-                    <td>{r.shoot_date || r.date || "-"}</td>
-                    <td>{r.duration_hours ?? "-"}</td>
-                    <td>
-                      {r.package_type || "-"}
-                      {r.package_price ? ` (₹${r.package_price})` : ""}
-                    </td>
-                    <td>{r.payment_method || "-"}</td>
+                    <td>{r.full_name}</td>
+                    <td>{displayEvent(r)}</td>
+                    <td>{r.event_date}</td>
+                    <td>{r.location_venue}</td>
+                    <td>{r.package_type}</td>
+                    <td>{r.budget_range}</td>
+                    <td>{displayPayment(r)}</td>
                     <td className="c">
                       <button className="mini" onClick={() => onEdit(r)}>
                         Edit
@@ -614,7 +639,7 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
                 ))}
                 {!pageRows.length && (
                   <tr>
-                    <td colSpan="9" className="c muted">
+                    <td colSpan="8" className="c muted">
                       {loading ? "Loading..." : "No records found."}
                     </td>
                   </tr>
@@ -648,4 +673,4 @@ const VideographyForm = ({ onClose, viewOnly = false }) => {
   );
 };
 
-export default VideographyForm;
+export default UserPhotographyBookingForm;

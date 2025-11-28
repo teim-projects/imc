@@ -2894,3 +2894,77 @@ body {
 .sm-lightbox-meta .caption {
   opacity: 0.8;
 }
+
+
+
+
+
+/* Location cell – auto width + nice wrap */
+.sm-td-location {
+  max-width: 360px;          /* enough width but still responsive */
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.sm-location-main {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.sm-location-map {
+  margin-top: 4px;
+}
+
+.sm-location-map a {
+  font-size: 12px;
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+/* Images cell – thumbnails in row, auto-wrap */
+.sm-images-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* thumbs already used in form; keeping here for clarity */
+.sm-thumb-cell {
+  position: relative;
+  width: 72px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+}
+
+.sm-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+.sm-thumb-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  color: #fff;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* Optional: let table auto-size columns nicely */
+.studio-master-page .pf-table {
+  table-layout: auto;
+}

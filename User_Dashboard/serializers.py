@@ -104,3 +104,223 @@ class UserStudioBookingSerializer(serializers.ModelSerializer):
             instance.payment_methods = payment_methods
             instance.save(update_fields=["payment_methods_csv"])
         return instance
+
+
+
+
+
+from rest_framework import serializers
+from api.models import PhotographyBooking   # use same table/model
+
+class UserPhotographyBookingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PhotographyBooking
+        fields = [
+            "id",
+            "full_name",
+            "email",
+            "phone",
+            "event_type",
+            "event_date",
+            "start_time",
+            "duration_hours",
+            "location_venue",
+            "city",
+            "package_type",
+            "num_photographers",
+            "need_videography",
+            "need_album",
+            "need_drone",
+            "budget_range",
+            "notes",
+            "payment_method",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        user = self.context["request"].user
+        validated_data["user"] = user
+        return super().create(validated_data)
+
+
+
+# User_Dashboard/serializers.py
+
+from rest_framework import serializers
+from api.models import Event, EventBooking
+
+
+class EventListSerializer(serializers.ModelSerializer):
+    """
+    Public event serializer for user side (used on UserEvents.jsx).
+    Maps Event model fields to the names the frontend expects.
+    """
+
+    # frontend expects: name, event_date, event_time, ticket_price
+    name = serializers.CharField(source="title")
+    event_date = serializers.DateField(source="date")
+    event_time = serializers.CharField(source="time_slot")
+    ticket_price = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "name",           # from title
+            "event_type",
+            "event_date",     # from date
+            "event_time",     # from time_slot
+            "location",
+            "description",
+
+            # prices
+            "ticket_price",   # computed
+            "basic_price",
+            "premium_price",
+            "vip_price",
+
+            # seats (overall + per tier)
+            "basic_seats",
+            "premium_seats",
+            "vip_seats",
+            "total_seats",
+            "available_seats",
+        ]
+
+    def get_ticket_price(self, obj):
+        """
+        Main price for card UI: prefer basic_price, else legacy ticket_price, else 0.
+        """
+        if obj.basic_price is not None:
+            return obj.basic_price
+        if obj.ticket_price is not None:
+            return obj.ticket_price
+        return 0
+
+
+class UserEventBookingSerializer(serializers.ModelSerializer):
+    """
+    Serializer for user's event bookings (list + create).
+
+    Used by: /user/event-bookings/  ViewSet.
+    """
+    # this is filled automatically from event.title
+    event_name = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = EventBooking
+        fields = [
+            "id",
+            "event",
+            "event_name",
+            "customer_name",
+            "contact_number",
+            "email",
+            "ticket_type",        # basic / premium / vip / general
+            "number_of_tickets",
+            "total_amount",
+            "payment_method",     # UPI / Card / Cash
+            "status",             # read-only: confirmed / pending / cancelled
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "user",
+            "event_name",
+            "status",
+            "created_at",
+        ]
+
+    # -------- helpers --------
+
+    def _tier_capacity(self, event, ticket_type: str) -> int:
+        """
+        Simple per-tier capacity based on Event fields.
+        (Currently static – not decreased per booking.)
+        """
+        t = (ticket_type or "general").lower()
+        if t == "basic":
+            return event.basic_seats or 0
+        if t == "premium":
+            return event.premium_seats or 0
+        if t == "vip":
+            return event.vip_seats or 0
+        # "general" – fall back to total_seats (or unlimited if 0)
+        return event.total_seats or 0
+
+    def _pick_price(self, event, ticket_type: str):
+        """
+        Decide price per ticket based on ticket_type and Event tier fields.
+        """
+        ticket_type = (ticket_type or "general").lower()
+
+        if ticket_type == "basic" and event.basic_price is not None:
+            return event.basic_price
+        if ticket_type == "premium" and event.premium_price is not None:
+            return event.premium_price
+        if ticket_type == "vip" and event.vip_price is not None:
+            return event.vip_price
+
+        # fallback to legacy general price
+        if event.ticket_price is not None:
+            return event.ticket_price
+
+        # last fallback
+        return 0
+
+    # -------- validation / create --------
+
+    def validate(self, attrs):
+        event = attrs.get("event")
+        number_of_tickets = attrs.get("number_of_tickets", 1)
+        ticket_type = attrs.get("ticket_type") or "general"
+
+        if not event:
+            raise serializers.ValidationError("Event is required.")
+
+        if number_of_tickets < 1:
+            raise serializers.ValidationError(
+                {"number_of_tickets": "Number of tickets must be at least 1."}
+            )
+
+        # simple capacity check against configured seats
+        capacity = self._tier_capacity(event, ticket_type)
+        if capacity and number_of_tickets > capacity:
+            raise serializers.ValidationError(
+                {
+                    "number_of_tickets": (
+                        f"Maximum {capacity} ticket(s) available for {ticket_type} tier."
+                    )
+                }
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        event = validated_data["event"]
+        number_of_tickets = validated_data.get("number_of_tickets", 1)
+        ticket_type = validated_data.get("ticket_type") or "general"
+
+        # snapshot event title
+        validated_data["event_name"] = event.title
+
+        # attach user if logged in
+        if user and user.is_authenticated:
+            validated_data["user"] = user
+
+        # auto-calculate total_amount if not provided or <= 0
+        price_per_ticket = self._pick_price(event, ticket_type)
+        total_amount = validated_data.get("total_amount")
+        if not total_amount or total_amount <= 0:
+            validated_data["total_amount"] = price_per_ticket * number_of_tickets
+
+        # default status – confirmed
+        if not validated_data.get("status"):
+            validated_data["status"] = "confirmed"
+
+        return super().create(validated_data)

@@ -11,10 +11,23 @@ const api = axios.create();
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access");
   if (token) {
-    config.headers = { ...(config.headers || {}), Authorization: `Bearer ${token}` };
+    config.headers = {
+      ...(config.headers || {}),
+      Authorization: `Bearer ${token}`,
+    };
   }
   return config;
 });
+
+// Reusable time slot options
+const TIME_SLOT_OPTIONS = [
+  "10:00 - 12:00",
+  "12:00 - 14:00",
+  "14:00 - 16:00",
+  "16:00 - 18:00",
+  "18:00 - 20:00",
+  "20:00 - 22:00",
+];
 
 const EventsForm = ({ onClose }) => {
   const [tab, setTab] = useState("ADD");
@@ -34,11 +47,20 @@ const EventsForm = ({ onClose }) => {
     title: "",
     location: "",
     date: "",
+    time_slot: "",
     event_type: "",
+    // ⭐ seats (total & available)
+    total_seats: "",
+    available_seats: "",
+    // prices
     ticket_price: "",
     basic_price: "",
     premium_price: "",
     vip_price: "",
+    // ⭐ seats per tier
+    basic_seats: "",
+    premium_seats: "",
+    vip_seats: "",
     description: "",
   });
 
@@ -117,11 +139,17 @@ const EventsForm = ({ onClose }) => {
       title: "",
       location: "",
       date: "",
+      time_slot: "",
       event_type: "",
+      total_seats: "",
+      available_seats: "",
       ticket_price: "",
       basic_price: "",
       premium_price: "",
       vip_price: "",
+      basic_seats: "",
+      premium_seats: "",
+      vip_seats: "",
       description: "",
     });
     setEditingId(null);
@@ -134,11 +162,70 @@ const EventsForm = ({ onClose }) => {
     return null;
   };
 
+  const validateSeats = () => {
+    // total / available
+    if (formData.total_seats === "" || formData.total_seats === null) {
+      return "Total seats is required.";
+    }
+    const total = Number(formData.total_seats);
+    if (Number.isNaN(total) || total < 0) {
+      return "Total seats must be 0 or more.";
+    }
+
+    let avail;
+    if (formData.available_seats === "" || formData.available_seats === null) {
+      avail = total; // backend will also default
+    } else {
+      avail = Number(formData.available_seats);
+      if (Number.isNaN(avail) || avail < 0) {
+        return "Available seats must be 0 or more.";
+      }
+    }
+    if (avail > total) {
+      return "Available seats cannot be more than total seats.";
+    }
+
+    // per-tier seats
+    const basicSeats =
+      formData.basic_seats === "" || formData.basic_seats === null
+        ? 0
+        : Number(formData.basic_seats);
+    const premiumSeats =
+      formData.premium_seats === "" || formData.premium_seats === null
+        ? 0
+        : Number(formData.premium_seats);
+    const vipSeats =
+      formData.vip_seats === "" || formData.vip_seats === null
+        ? 0
+        : Number(formData.vip_seats);
+
+    if (basicSeats < 0 || Number.isNaN(basicSeats)) {
+      return "Basic seats must be 0 or more.";
+    }
+    if (premiumSeats < 0 || Number.isNaN(premiumSeats)) {
+      return "Premium seats must be 0 or more.";
+    }
+    if (vipSeats < 0 || Number.isNaN(vipSeats)) {
+      return "VIP seats must be 0 or more.";
+    }
+
+    const tierSum = basicSeats + premiumSeats + vipSeats;
+    if (tierSum > total) {
+      return "Sum of Basic + Premium + VIP seats cannot exceed total seats.";
+    }
+
+    return null;
+  };
+
   const validate = () => {
     if (!formData.title?.trim()) return "Title is required.";
     if (!formData.location?.trim()) return "Location is required.";
     if (!formData.date?.trim()) return "Date is required.";
+    if (!formData.time_slot?.trim()) return "Time slot is required.";
     if (!formData.event_type) return "Event type is required (Live or Karaoke).";
+
+    const seatsErr = validateSeats();
+    if (seatsErr) return seatsErr;
 
     const basePriceErr = validatePrice(
       formData.ticket_price === "" ? 0 : formData.ticket_price,
@@ -161,17 +248,25 @@ const EventsForm = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     clearStatus();
-    setSaving(true);
 
     const v = validate();
     if (v) {
-      setSaving(false);
       setError(v);
       return;
     }
 
+    setSaving(true);
+
+    const totalSeatsNum = Number(formData.total_seats || 0);
+    const availableSeatsNum =
+      formData.available_seats === "" || formData.available_seats === null
+        ? totalSeatsNum
+        : Number(formData.available_seats);
+
     const payload = {
       ...formData,
+      total_seats: totalSeatsNum,
+      available_seats: availableSeatsNum,
       ticket_price:
         formData.ticket_price === "" ? "0" : String(Number(formData.ticket_price)),
       basic_price:
@@ -180,6 +275,12 @@ const EventsForm = ({ onClose }) => {
         formData.premium_price === "" ? null : String(Number(formData.premium_price)),
       vip_price:
         formData.vip_price === "" ? null : String(Number(formData.vip_price)),
+      basic_seats:
+        formData.basic_seats === "" ? null : Number(formData.basic_seats),
+      premium_seats:
+        formData.premium_seats === "" ? null : Number(formData.premium_seats),
+      vip_seats:
+        formData.vip_seats === "" ? null : Number(formData.vip_seats),
     };
 
     try {
@@ -205,11 +306,17 @@ const EventsForm = ({ onClose }) => {
       title: ev.title || "",
       location: ev.location || "",
       date: ev.date || "",
+      time_slot: ev.time_slot || "",
       event_type: ev.event_type || "",
+      total_seats: ev.total_seats ?? "",
+      available_seats: ev.available_seats ?? "",
       ticket_price: ev.ticket_price ?? "",
       basic_price: ev.basic_price ?? "",
       premium_price: ev.premium_price ?? "",
       vip_price: ev.vip_price ?? "",
+      basic_seats: ev.basic_seats ?? "",
+      premium_seats: ev.premium_seats ?? "",
+      vip_seats: ev.vip_seats ?? "",
       description: ev.description || "",
     });
     setEditingId(ev.id);
@@ -260,115 +367,181 @@ const EventsForm = ({ onClose }) => {
     return "-";
   };
 
-  // ---------------- UI ----------------
+  // ---------------- UI (pf style) ----------------
   return (
-    <div className="form-container pro">
-      {/* ===== HEADER ===== */}
-      <div className="form-header">
-        <h3>📅 Events (Live & Karaoke)</h3>
-        <div className="tabs">
+    <div className="pf-wrap">
+      {/* HEADER */}
+      <div className="pf-header">
+        <div>
+          <h2>Events (Live & Karaoke)</h2>
+          <p className="pf-subtitle">
+            Create and manage music events with seats and multiple ticket tiers.
+          </p>
+        </div>
+        <div className="pf-tabs">
           <button
-            className={`tab ${tab === "ADD" ? "active" : ""}`}
+            className={tab === "ADD" ? "active" : ""}
             onClick={() => setTab("ADD")}
             type="button"
           >
-            ➕ Add Event
+            Add Event
           </button>
           <button
-            className={`tab ${tab === "VIEW" ? "active" : ""}`}
+            className={tab === "VIEW" ? "active" : ""}
             onClick={() => setTab("VIEW")}
             type="button"
           >
-            👁 View Events
+            View Events
           </button>
+          {onClose && (
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ marginLeft: 8 }}
+              onClick={onClose}
+              aria-label="Close"
+            >
+              Close
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button className="close-x" onClick={onClose} aria-label="Close">
-            ✖
-          </button>
-        )}
       </div>
 
-      {/* ===== BANNERS ===== */}
-      {success && <div className="banner success">{success}</div>}
+      {/* BANNERS */}
+      {success && <div className="pf-banner pf-success">{success}</div>}
       {error && (
-        <pre className="banner error" style={{ whiteSpace: "pre-wrap" }}>
+        <pre className="pf-banner pf-error" style={{ whiteSpace: "pre-wrap" }}>
           {error}
         </pre>
       )}
 
-      {/* ===== ADD FORM ===== */}
+      {/* ADD FORM */}
       {tab === "ADD" && (
-        <form onSubmit={handleSubmit} className="grid two-col">
-          <div className="group">
-            <label>Event Title *</label>
-            <input
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              placeholder="Music Fest 2025"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="pf-form">
+          {/* 1) EVENT DETAILS */}
+          <section className="pf-card">
+            <h3>Event Details</h3>
+            <div className="pf-grid">
+              <label>
+                Event Title*
+                <input
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  placeholder="Music Fest 2025"
+                  required
+                />
+              </label>
 
-          <div className="group">
-            <label>Location *</label>
-            <input
-              name="location"
-              value={formData.location}
-              onChange={handleChange}
-              placeholder="Mumbai / Delhi / Bangalore"
-              required
-            />
-          </div>
+              <label>
+                Location*
+                <input
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  placeholder="Mumbai / Delhi / Bangalore"
+                  required
+                />
+              </label>
 
-          <div className="group">
-            <label>Date *</label>
-            <input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleChange}
-              required
-            />
-          </div>
+              <label>
+                Date*
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  required
+                />
+              </label>
 
-          {/* Event Type: Live / Karaoke */}
-          <div className="group">
-            <label>Event Type *</label>
-            <div className="tier-grid event-type-chips">
-              <button
-                type="button"
-                className={
-                  "payment-chip" + (formData.event_type === "live" ? " active" : "")
-                }
-                onClick={() => setEventType("live")}
-              >
-                <span className="chip-checkbox">
-                  {formData.event_type === "live" ? "✔" : ""}
-                </span>
-                <span className="chip-label">Live</span>
-              </button>
-              <button
-                type="button"
-                className={
-                  "payment-chip" +
-                  (formData.event_type === "karaoke" ? " active" : "")
-                }
-                onClick={() => setEventType("karaoke")}
-              >
-                <span className="chip-checkbox">
-                  {formData.event_type === "karaoke" ? "✔" : ""}
-                </span>
-                <span className="chip-label">Karaoke</span>
-              </button>
+              <label>
+                Time Slot*
+                <select
+                  name="time_slot"
+                  value={formData.time_slot}
+                  onChange={handleChange}
+                >
+                  <option value="">-- Select Time Slot --</option>
+                  {TIME_SLOT_OPTIONS.map((slot) => (
+                    <option key={slot} value={slot}>
+                      {slot}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Event Type*
+                <div className="pf-methods">
+                  <div className="pf-tags">
+                    <button
+                      type="button"
+                      className={
+                        formData.event_type === "live" ? "tag active" : "tag"
+                      }
+                      onClick={() => setEventType("live")}
+                    >
+                      Live
+                    </button>
+                    <button
+                      type="button"
+                      className={
+                        formData.event_type === "karaoke"
+                          ? "tag active"
+                          : "tag"
+                      }
+                      onClick={() => setEventType("karaoke")}
+                    >
+                      Karaoke
+                    </button>
+                  </div>
+                </div>
+              </label>
+
+              {/* ⭐ Seats */}
+              <label>
+                Total Seats*
+                <input
+                  type="number"
+                  min="0"
+                  name="total_seats"
+                  value={formData.total_seats}
+                  onChange={handleChange}
+                  placeholder="100"
+                />
+              </label>
+
+              <label>
+                Available Seats
+                <input
+                  type="number"
+                  min="0"
+                  name="available_seats"
+                  value={formData.available_seats}
+                  onChange={handleChange}
+                  placeholder="Leave blank to use total seats"
+                />
+              </label>
+
+              <label>
+                Base Ticket Price (₹)*
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  name="ticket_price"
+                  value={formData.ticket_price}
+                  onChange={handleChange}
+                  placeholder="500"
+                />
+              </label>
             </div>
-          </div>
+          </section>
 
-
-          {/* ==== BEAUTIFUL TICKET TIER CARDS ==== */}
-          <div className="group full">
-            <label>Ticket Price Options</label>
+          {/* 2) TICKET TIERS */}
+          <section className="pf-card">
+            <h3>Ticket Tiers</h3>
             <div className="tier-grid pretty-tiers">
               {/* BASIC */}
               <div className="tier-card tier-basic">
@@ -390,6 +563,18 @@ const EventsForm = ({ onClose }) => {
                     className="tier-input"
                   />
                   <span className="tier-suffix">/ person</span>
+                </div>
+                <div className="tier-seat-row">
+                  <span className="tier-seat-label">Seats</span>
+                  <input
+                    type="number"
+                    min="0"
+                    name="basic_seats"
+                    value={formData.basic_seats}
+                    onChange={handleChange}
+                    placeholder="e.g. 40"
+                    className="tier-input small"
+                  />
                 </div>
               </div>
 
@@ -414,6 +599,18 @@ const EventsForm = ({ onClose }) => {
                   />
                   <span className="tier-suffix">/ person</span>
                 </div>
+                <div className="tier-seat-row">
+                  <span className="tier-seat-label">Seats</span>
+                  <input
+                    type="number"
+                    min="0"
+                    name="premium_seats"
+                    value={formData.premium_seats}
+                    onChange={handleChange}
+                    placeholder="e.g. 30"
+                    className="tier-input small"
+                  />
+                </div>
               </div>
 
               {/* VIP */}
@@ -437,42 +634,56 @@ const EventsForm = ({ onClose }) => {
                   />
                   <span className="tier-suffix">/ person</span>
                 </div>
+                <div className="tier-seat-row">
+                  <span className="tier-seat-label">Seats</span>
+                  <input
+                    type="number"
+                    min="0"
+                    name="vip_seats"
+                    value={formData.vip_seats}
+                    onChange={handleChange}
+                    placeholder="e.g. 20"
+                    className="tier-input small"
+                  />
+                </div>
               </div>
             </div>
             <p className="hint">
-              Leave any tier blank if you don&apos;t offer that option.
+              Leave any tier blank if you don&apos;t offer that option. Seat
+              counts across tiers should not exceed total seats.
             </p>
-          </div>
+          </section>
 
-          <div className="group full">
-            <label>Description</label>
-            <textarea
-              name="description"
-              rows="3"
-              value={formData.description}
-              onChange={handleChange}
-              placeholder="Short event details..."
-              style={{
-                padding: "10px",
-                borderRadius: "10px",
-                border: "1px solid #d9e2ef",
-              }}
-            />
-          </div>
+          {/* 3) DESCRIPTION */}
+          <section className="pf-card">
+            <h3>Description</h3>
+            <div className="pf-grid">
+              <label className="pf-notes-label">
+                <textarea
+                  name="description"
+                  rows="3"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Short event details..."
+                />
+              </label>
+            </div>
+          </section>
 
-          <div className="actions full">
-            <button type="submit" className="primary" disabled={saving}>
+          {/* ACTIONS */}
+          <div className="pf-actions">
+            <button type="submit" className="btn" disabled={saving}>
               {saving
                 ? editingId
                   ? "Updating..."
                   : "Saving..."
                 : editingId
-                ? "Update"
-                : "Save"}
+                ? "Update Event"
+                : "Save Event"}
             </button>
             <button
               type="button"
-              className="ghost"
+              className="btn ghost"
               onClick={resetForm}
               disabled={saving}
             >
@@ -481,24 +692,24 @@ const EventsForm = ({ onClose }) => {
           </div>
 
           {editingId && (
-            <div className="hint full">
+            <div className="pf-hint">
               Editing Event <strong>#{editingId}</strong>
             </div>
           )}
         </form>
       )}
 
-      {/* ===== VIEW TABLE ===== */}
+      {/* VIEW TABLE */}
       {tab === "VIEW" && (
-        <div className="view-wrap">
-          <div className="toolbar">
+        <div className="pf-table-card">
+          <div className="pf-table-top">
             <input
-              className="search"
+              className="pf-search"
               placeholder="Search events..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <button className="ghost" onClick={fetchEvents} disabled={loading}>
+            <button className="btn" onClick={fetchEvents} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
@@ -509,16 +720,18 @@ const EventsForm = ({ onClose }) => {
             <div className="empty">No events found.</div>
           ) : (
             <>
-              <div className="table-wrap">
-                <table className="nice-table">
+              <div className="pf-table-wrap">
+                <table className="pf-table">
                   <thead>
                     <tr>
                       <th>Title</th>
                       <th>Location</th>
                       <th>Date</th>
+                      <th>Time Slot</th>
+                      <th>Seats</th>
                       <th>Type / Ticket Prices</th>
                       <th>Description</th>
-                      <th className="right">Actions</th>
+                      <th className="c">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -527,6 +740,22 @@ const EventsForm = ({ onClose }) => {
                         <td>{ev.title}</td>
                         <td>{ev.location}</td>
                         <td>{ev.date}</td>
+                        <td>{ev.time_slot || "-"}</td>
+                        <td>
+                          <div>Total: {ev.total_seats ?? 0}</div>
+                          <div>Available: {ev.available_seats ?? 0}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {ev.basic_seats != null && (
+                              <div>Basic: {ev.basic_seats}</div>
+                            )}
+                            {ev.premium_seats != null && (
+                              <div>Premium: {ev.premium_seats}</div>
+                            )}
+                            {ev.vip_seats != null && (
+                              <div>VIP: {ev.vip_seats}</div>
+                            )}
+                          </div>
+                        </td>
                         <td>
                           <div>
                             <strong>{renderEventTypeLabel(ev.event_type)}</strong>
@@ -542,20 +771,20 @@ const EventsForm = ({ onClose }) => {
                           {ev.vip_price && <div>VIP: ₹ {ev.vip_price}</div>}
                         </td>
                         <td>{ev.description || "-"}</td>
-                        <td className="right">
+                        <td className="c">
                           <button
                             className="mini"
                             onClick={() => handleEdit(ev)}
                             disabled={saving}
                           >
-                            ✏️ Edit
+                            Edit
                           </button>
                           <button
                             className="mini danger"
                             onClick={() => handleDelete(ev.id)}
                             disabled={saving}
                           >
-                            🗑 Delete
+                            Delete
                           </button>
                         </td>
                       </tr>
@@ -564,21 +793,23 @@ const EventsForm = ({ onClose }) => {
                 </table>
               </div>
 
-              <div className="pagination">
+              <div className="pf-pager">
                 <button
+                  className="mini"
                   disabled={page === 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
-                  ‹ Prev
+                  Prev
                 </button>
                 <span>
                   Page {page} / {totalPages}
                 </span>
                 <button
+                  className="mini"
                   disabled={page === totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next ›
+                  Next
                 </button>
               </div>
             </>

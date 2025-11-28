@@ -1,3 +1,4 @@
+// src/components/Forms/PrivateBookingForm.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import "./Forms.css";
@@ -87,7 +88,10 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
       const list = Array.isArray(data) ? data : data?.results ?? data ?? [];
       const safeList = Array.isArray(list) ? list : [];
       setRows(safeList);
-      const totalPagesAfter = Math.max(1, Math.ceil((safeList.length || 0) / pageSize));
+      const totalPagesAfter = Math.max(
+        1,
+        Math.ceil((safeList.length || 0) / pageSize)
+      );
       if (page > totalPagesAfter) setPage(totalPagesAfter);
     } catch (err) {
       setError(humanizeErr(err));
@@ -209,7 +213,7 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
     const payload = {
       ...formData,
       duration: Number(formData.duration),
-      time_slot: formData.time_slot ? formData.time_slot : null, // DRF prefers null over ""
+      time_slot: formData.time_slot ? formData.time_slot : null,
       guest_count: formData.guest_count === "" ? null : Number(formData.guest_count),
       payment_methods: Array.isArray(formData.payment_methods)
         ? formData.payment_methods
@@ -237,212 +241,270 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
 
   // ---------- UI ----------
   return (
-    <div className="form-container pro">
-      <div className="form-header">
-        <h3>🕴️Private Music Events </h3>
-        <div className="tabs">
+    <div className="pf-wrap">
+      {/* HEADER */}
+      <div className="pf-header">
+        <div>
+          <h2>Private Music Events</h2>
+          <p className="pf-subtitle">
+            Manage private bookings like birthdays, weddings, and corporate parties.
+          </p>
+        </div>
+        <div className="pf-tabs">
           <button
-            className={tab === "ADD" ? "tab active" : "tab"}
+            className={tab === "ADD" ? "active" : ""}
             onClick={() => setTab("ADD")}
             type="button"
           >
             Add Booking
           </button>
           <button
-            className={tab === "VIEW" ? "tab active" : "tab"}
+            className={tab === "VIEW" ? "active" : ""}
             onClick={() => setTab("VIEW")}
             type="button"
           >
             View Bookings
           </button>
+          {onClose && (
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ marginLeft: 8 }}
+              onClick={onClose}
+              aria-label="Close"
+            >
+              Close
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button className="close-x" onClick={onClose} aria-label="Close">
-            ✖
-          </button>
-        )}
       </div>
 
-      {successMsg && <div className="banner success">{successMsg}</div>}
+      {/* BANNERS */}
+      {successMsg && <div className="pf-banner pf-success">{successMsg}</div>}
       {error && (
-        <pre className="banner error" style={{ whiteSpace: "pre-wrap" }}>
-{error}
+        <pre className="pf-banner pf-error" style={{ whiteSpace: "pre-wrap" }}>
+          {error}
         </pre>
       )}
 
+      {/* ADD FORM */}
       {tab === "ADD" && (
-        <form onSubmit={handleSubmit} className="grid two-col">
-          <div className="group">
-            <label>Customer Name *</label>
-            <input
-              name="customer"
-              value={formData.customer}
-              onChange={handleChange}
-              placeholder="e.g., Rahul Verma"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="pf-form">
+          {/* 1) CUSTOMER DETAILS */}
+          <section className="pf-card">
+            <h3>Customer Details</h3>
+            <div className="pf-grid">
+              <label>
+                Customer Name*
+                <input
+                  name="customer"
+                  value={formData.customer}
+                  onChange={handleChange}
+                  placeholder="e.g., Rahul Verma"
+                  required
+                />
+              </label>
 
-          <div className="group">
-            <label>Contact Number</label>
-            <input
-              name="contact_number"
-              value={formData.contact_number}
-              onChange={handleChange}
-              placeholder="+91XXXXXXXXXX"
-            />
-          </div>
+              <label>
+                Contact Number
+                <input
+                  name="contact_number"
+                  value={formData.contact_number}
+                  onChange={handleChange}
+                  placeholder="+91XXXXXXXXXX"
+                />
+              </label>
 
-          <div className="group">
-            <label>Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="customer@email.com"
-            />
-          </div>
+              <label>
+                Email
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="customer@email.com"
+                />
+              </label>
 
-          <div className="group">
-            <label>Address</label>
-            <input
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              placeholder="Street, City"
-            />
-          </div>
-
-          <div className="group">
-            <label>Event Type *</label>
-            <input
-              name="event_type"
-              value={formData.event_type}
-              onChange={handleChange}
-              placeholder="Birthday / Wedding / Corporate / Private Party"
-              required
-            />
-          </div>
-
-          <div className="group">
-            <label>Venue *</label>
-            <input
-              name="venue"
-              value={formData.venue}
-              onChange={handleChange}
-              placeholder="IMC Banquet Hall / Client Venue"
-              required
-            />
-          </div>
-
-          <div className="group">
-            <label>Date *</label>
-            <input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="group">
-            <label>Time Slot</label>
-            <input
-              type="time"
-              name="time_slot"
-              value={formData.time_slot}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="group">
-            <label>Duration (hours) *</label>
-            <input
-              type="number"
-              step="0.1"
-              min="0.5"
-              name="duration"
-              value={formData.duration}
-              onChange={handleChange}
-              placeholder="e.g., 3"
-              required
-            />
-          </div>
-
-          <div className="group">
-            <label>Guest Count</label>
-            <input
-              type="number"
-              min="1"
-              name="guest_count"
-              value={formData.guest_count}
-              onChange={handleChange}
-              placeholder="e.g., 120"
-            />
-          </div>
-
-          <div className="group full">
-            <label>Special Notes</label>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              placeholder="Any special arrangements, artist requirements, A/V setup, etc."
-              rows={3}
-            />
-          </div>
-
-          <div className="group full">
-            <label>Payment Options</label>
-            <div className="payment-options pill">
-              {["Card", "UPI", "NetBanking"].map((m) => (
-                <label key={m} className="pill-item">
-                  <input
-                    type="checkbox"
-                    checked={formData.payment_methods.includes(m)}
-                    onChange={() => handlePaymentChange(m)}
-                  />
-                  <span>{m}</span>
-                </label>
-              ))}
+              <label>
+                Address
+                <input
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Street, City"
+                />
+              </label>
             </div>
-          </div>
+          </section>
 
-          <div className="actions full">
-            <button type="submit" className="primary" disabled={saving}>
-              {saving ? (editingId ? "Updating..." : "Saving...") : editingId ? "Update" : "Save"}
+          {/* 2) EVENT DETAILS */}
+          <section className="pf-card">
+            <h3>Event Details</h3>
+            <div className="pf-grid">
+              <label>
+                Event Type*
+                <input
+                  name="event_type"
+                  value={formData.event_type}
+                  onChange={handleChange}
+                  placeholder="Birthday / Wedding / Corporate / Private Party"
+                  required
+                />
+              </label>
+
+              <label>
+                Venue*
+                <input
+                  name="venue"
+                  value={formData.venue}
+                  onChange={handleChange}
+                  placeholder="IMC Banquet Hall / Client Venue"
+                  required
+                />
+              </label>
+
+              <label>
+                Guest Count
+                <input
+                  type="number"
+                  min="1"
+                  name="guest_count"
+                  value={formData.guest_count}
+                  onChange={handleChange}
+                  placeholder="e.g., 120"
+                />
+              </label>
+            </div>
+          </section>
+
+          {/* 3) SCHEDULE */}
+          <section className="pf-card">
+            <h3>Schedule</h3>
+            <div className="pf-grid">
+              <label>
+                Date*
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  required
+                />
+              </label>
+
+              <label>
+                Time
+                <input
+                  type="time"
+                  name="time_slot"
+                  value={formData.time_slot}
+                  onChange={handleChange}
+                />
+              </label>
+
+              <label>
+                Duration (hours)*
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.5"
+                  name="duration"
+                  value={formData.duration}
+                  onChange={handleChange}
+                  placeholder="e.g., 3"
+                  required
+                />
+              </label>
+            </div>
+          </section>
+
+          {/* 4) PAYMENT & NOTES */}
+          <section className="pf-card">
+            <h3>Payment & Notes</h3>
+            <div className="pf-grid">
+              <label>
+                Payment Options
+                <div className="pf-methods">
+                  <div className="pf-tags">
+                    {["Card", "UPI", "NetBanking"].map((m) => (
+                      <button
+                        type="button"
+                        key={m}
+                        className={
+                          formData.payment_methods.includes(m)
+                            ? "tag active"
+                            : "tag"
+                        }
+                        onClick={() => handlePaymentChange(m)}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </label>
+
+              <label className="pf-notes-label">
+                Special Notes
+                <textarea
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  placeholder="Any special arrangements, artist requirements, A/V setup, etc."
+                  rows={3}
+                />
+              </label>
+            </div>
+          </section>
+
+          {/* ACTIONS */}
+          <div className="pf-actions">
+            <button type="submit" className="btn" disabled={saving}>
+              {saving
+                ? editingId
+                  ? "Updating..."
+                  : "Saving..."
+                : editingId
+                ? "Update Booking"
+                : "Save Booking"}
             </button>
-            <button type="button" className="ghost" onClick={resetForm} disabled={saving}>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={resetForm}
+              disabled={saving}
+            >
               Reset
             </button>
           </div>
 
           {editingId && (
-            <div className="hint full">
+            <div className="pf-hint">
               Editing booking <strong>#{editingId}</strong>
             </div>
           )}
         </form>
       )}
 
+      {/* VIEW TABLE */}
       {tab === "VIEW" && (
-        <div className="view-wrap">
-          <div className="toolbar">
+        <div className="pf-table-card">
+          <div className="pf-table-top">
             <input
-              className="search"
+              className="pf-search"
               placeholder="Search: customer, event, venue, email, phone"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <input
               type="date"
-              className="date-filter"
+              className="pf-search"
+              style={{ maxWidth: 180 }}
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
             />
-            <button className="ghost" onClick={fetchRows} disabled={loading}>
+            <button className="btn" onClick={fetchRows} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
@@ -453,8 +515,8 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
             <div className="empty">No bookings found.</div>
           ) : (
             <>
-              <div className="table-wrap">
-                <table className="nice-table">
+              <div className="pf-table-wrap">
+                <table className="pf-table">
                   <thead>
                     <tr>
                       <th>Customer</th>
@@ -465,7 +527,7 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
                       <th>Duration</th>
                       <th>Guests</th>
                       <th>Payment</th>
-                      <th className="right">Actions</th>
+                      <th className="c">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -477,22 +539,31 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
                         <td>{b.date || "-"}</td>
                         <td>{b.time_slot || "-"}</td>
                         <td>{b.duration || "-"}</td>
-                        <td>{b.guest_count === 0 || b.guest_count ? b.guest_count : "-"}</td>
                         <td>
-                          {Array.isArray(b.payment_methods) && b.payment_methods.length
+                          {b.guest_count === 0 || b.guest_count
+                            ? b.guest_count
+                            : "-"}
+                        </td>
+                        <td>
+                          {Array.isArray(b.payment_methods) &&
+                          b.payment_methods.length
                             ? b.payment_methods.join(", ")
                             : "-"}
                         </td>
-                        <td className="right">
-                          <button className="mini" onClick={() => handleEdit(b)} disabled={saving}>
-                            ✏️ Edit
+                        <td className="c">
+                          <button
+                            className="mini"
+                            onClick={() => handleEdit(b)}
+                            disabled={saving}
+                          >
+                            Edit
                           </button>
                           <button
                             className="mini danger"
                             onClick={() => handleDelete(b.id)}
                             disabled={saving}
                           >
-                            🗑 Delete
+                            Delete
                           </button>
                         </td>
                       </tr>
@@ -501,13 +572,23 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
                 </table>
               </div>
 
-              <div className="pagination">
-                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
-                  ‹ Prev
+              <div className="pf-pager">
+                <button
+                  className="mini"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  Prev
                 </button>
-                <span>Page {page} / {totalPages}</span>
-                <button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}>
-                  Next ›
+                <span>
+                  Page {page} / {totalPages}
+                </span>
+                <button
+                  className="mini"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
                 </button>
               </div>
             </>

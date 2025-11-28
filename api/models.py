@@ -225,6 +225,9 @@ class Studio(models.Model):
 # ============================================================
 # ===================== STUDIO BOOKING =======================
 # ============================================================
+from django.db import models
+from decimal import Decimal
+from django.core.validators import MinValueValidator
 
 class Studio(models.Model):
     # Customer Info
@@ -233,10 +236,9 @@ class Studio(models.Model):
     email = models.EmailField(blank=True, null=True)
     address = models.TextField(blank=True, null=True)
 
-    # Studio Rental (kept as a plain name to preserve old data)
     studio_name = models.CharField(max_length=100)
     date = models.DateField()
-    time_slot = models.TimeField(blank=True, null=True)  # "HH:MM" accepted
+    time_slot = models.TimeField(blank=True, null=True)
     duration = models.DecimalField(
         max_digits=4,
         decimal_places=1,
@@ -244,7 +246,14 @@ class Studio(models.Model):
         help_text="Duration in hours",
     )
 
-    # Payment Options (CSV; API can expose list)
+    price_per_hour = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text="Price per hour in INR for this booking",
+    )
+
     payment_methods = models.CharField(
         max_length=255,
         blank=True,
@@ -252,7 +261,6 @@ class Studio(models.Model):
         help_text="Comma-separated: Card, UPI, NetBanking",
     )
 
-    # Meta
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -284,6 +292,12 @@ class Studio(models.Model):
         if "," not in s:
             return [s]
         return [x.strip() for x in s.split(",") if x.strip()]
+
+    @property
+    def total_price(self):
+        if self.price_per_hour is None or self.duration is None:
+            return None
+        return self.price_per_hour * self.duration
 
 
 # ============================================================
@@ -385,6 +399,10 @@ class PhotographyBooking(models.Model):
 # ============================================================
 # api/models.py
 from django.db import models
+from django.conf import settings
+
+CustomUser = settings.AUTH_USER_MODEL
+
 
 class Event(models.Model):
     EVENT_TYPES = [
@@ -396,6 +414,12 @@ class Event(models.Model):
     location = models.CharField(max_length=255)
     date = models.DateField()
 
+    # Time slot for the event (e.g. "18:00 - 20:00")
+    time_slot = models.CharField(
+        max_length=50,
+        help_text="Time slot for the event, e.g. '18:00 - 20:00'.",
+    )
+
     # Live / Karaoke
     event_type = models.CharField(
         max_length=20,
@@ -403,13 +427,40 @@ class Event(models.Model):
         default="live",
     )
 
-    # OLD general price (optional now, front-end not using it)
+    # ⭐ Seats (overall)
+    total_seats = models.PositiveIntegerField(
+        default=0,
+        help_text="Total seats for this event.",
+    )
+    available_seats = models.PositiveIntegerField(
+        default=0,
+        help_text="Seats remaining for bookings.",
+    )
+
+    # ⭐ Seats per ticket tier (optional)
+    basic_seats = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Seats allocated for Basic tickets (optional).",
+    )
+    premium_seats = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Seats allocated for Premium tickets (optional).",
+    )
+    vip_seats = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Seats allocated for VIP tickets (optional).",
+    )
+
+    # OLD general price (optional now)
     ticket_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Legacy general ticket price (optional)."
+        help_text="Legacy general ticket price (optional).",
     )
 
     # New tier prices (all optional)
@@ -418,32 +469,116 @@ class Event(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Basic ticket price (₹)."
+        help_text="Basic ticket price (₹).",
     )
     premium_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Premium ticket price (₹)."
+        help_text="Premium ticket price (₹).",
     )
     vip_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="VIP ticket price (₹)."
+        help_text="VIP ticket price (₹).",
     )
 
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-date", "-created_at"]
+        ordering = ["-date", "time_slot", "-created_at"]
+
+    def save(self, *args, **kwargs):
+        """
+        On first create:
+        - If available_seats is not set, default it to total_seats
+        (tier seats are optional and only used for UI / reporting).
+        """
+        if self.pk is None and (self.available_seats is None or self.available_seats == 0):
+            self.available_seats = self.total_seats
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.title} ({self.get_event_type_display()})"
+        return f"{self.title} ({self.get_event_type_display()}) @ {self.date} {self.time_slot or ''}"
 
+
+class EventBooking(models.Model):
+    """
+    Stores a user's booking for a specific event.
+    Supports ticket type (basic/premium/vip/general) and payment method.
+    """
+
+    PAYMENT_METHODS = [
+        ("UPI", "UPI"),
+        ("Card", "Card"),
+        ("Cash", "Cash"),
+    ]
+
+    TICKET_TYPE_CHOICES = [
+        ("basic", "Basic"),
+        ("premium", "Premium"),
+        ("vip", "VIP"),
+        ("general", "General"),
+    ]
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("confirmed", "Confirmed"),
+        ("cancelled", "Cancelled"),
+    ]
+
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_bookings",
+    )
+
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name="bookings",
+    )
+
+    # snapshot so even if event title changes, booking still shows old name
+    event_name = models.CharField(max_length=255, blank=True)
+
+    customer_name = models.CharField(max_length=120)
+    contact_number = models.CharField(max_length=20)
+    email = models.EmailField(blank=True)
+
+    ticket_type = models.CharField(
+        max_length=20,
+        choices=TICKET_TYPE_CHOICES,
+        default="general",
+    )
+
+    number_of_tickets = models.PositiveIntegerField(default=1)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    payment_method = models.CharField(
+        max_length=10,
+        choices=PAYMENT_METHODS,
+        default="UPI",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.customer_name} • {self.event_name or self.event.title} ({self.number_of_tickets} tickets)"
 
 # ============================================================
 # ===================== PAYMENT MODEL ========================
@@ -497,10 +632,19 @@ class Videography(models.Model):
         ("Card", "Card"),
         ("UPI", "UPI"),
     ]
+
     PACKAGE_CHOICES = [
         ("Standard", "Standard"),
         ("Premium", "Premium"),
         ("Custom", "Custom"),
+    ]
+
+    # ✅ Event type choices (matching your frontend dropdown)
+    EVENT_TYPE_CHOICES = [
+        ("theatre music events", "theatre music events"),
+        ("private music events", "private music events"),
+        ("Birthday", "Birthday"),
+        ("Other", "Other"),
     ]
 
     # Basic client info
@@ -531,13 +675,29 @@ class Videography(models.Model):
         default="Standard",
     )
 
-    # ✅ NEW: Package Price stored in DB
+    # ✅ Package Price stored in DB
     package_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         null=True,
         blank=True,
         help_text="Package price in INR",
+    )
+
+    # ✅ NEW: Event type (optional) – ties to your frontend dropdown
+    event_type = models.CharField(
+        max_length=50,
+        choices=EVENT_TYPE_CHOICES,
+        blank=True,
+        default="",
+        help_text="Type of event (theatre music events, private music events, Birthday, Other)",
+    )
+
+    # ✅ NEW: Other event name (when event_type = 'Other')
+    other_event_name = models.CharField(
+        max_length=150,
+        blank=True,
+        help_text="Custom event name when event_type is 'Other'",
     )
 
     payment_method = models.CharField(
@@ -565,7 +725,13 @@ class Videography(models.Model):
         ordering = ("-shoot_date", "-created_at")
 
     def __str__(self):
-        return f"{self.project} — {self.editor} ({self.shoot_date})"
+        # If "Other", show the custom name in brackets
+        extra = ""
+        if self.event_type == "Other" and self.other_event_name:
+            extra = f" [{self.other_event_name}]"
+        elif self.event_type:
+            extra = f" ({self.event_type})"
+        return f"{self.project}{extra} — {self.editor} ({self.shoot_date})"
 
 
 
@@ -710,7 +876,6 @@ class Singer(models.Model):
 # ===============================================
 # ============  Singing (SERVICE)  =========
 # ===============================================
-
 # api/models.py
 from django.db import models
 from django.core.validators import MinValueValidator
@@ -727,6 +892,16 @@ class SingingClass(models.Model):
         CONFIRMED = "confirmed", "Confirmed"
         CANCELLED = "cancelled", "Cancelled"
 
+    # NEW: keep a fixed set of days
+    class DayChoices(models.TextChoices):
+        MONDAY = "Monday", "Monday"
+        TUESDAY = "Tuesday", "Tuesday"
+        WEDNESDAY = "Wednesday", "Wednesday"
+        THURSDAY = "Thursday", "Thursday"
+        FRIDAY = "Friday", "Friday"
+        SATURDAY = "Saturday", "Saturday"
+        SUNDAY = "Sunday", "Sunday"
+
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20)
@@ -740,7 +915,24 @@ class SingingClass(models.Model):
     state = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
 
-    preferred_batch = models.CharField(max_length=100)
+    # NEW: separate day + time slot fields
+    day = models.CharField(
+        max_length=16,
+        choices=DayChoices.choices,
+        help_text="Day of class (Monday–Sunday).",
+    )
+    time_slot = models.CharField(
+        max_length=50,
+        help_text="Time slot like '07:00 - 08:00'.",
+    )
+
+    # Kept for compatibility / display, auto-filled from day + time_slot
+    preferred_batch = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Auto: 'Day - TimeSlot', e.g., 'Monday - 07:00 - 08:00'.",
+    )
+
     reference_by = models.CharField(max_length=100, blank=True)
 
     fee = models.DecimalField(
@@ -770,4 +962,22 @@ class SingingClass(models.Model):
         ordering = ("-created_at",)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.preferred_batch})"
+        return f"{self.first_name} {self.last_name} ({self.preferred_batch or self.day})"
+
+    def save(self, *args, **kwargs):
+        """
+        Always keep preferred_batch in sync with day + time_slot.
+        This way older UI / filters using preferred_batch still work.
+        """
+        if self.day and self.time_slot:
+            self.preferred_batch = f"{self.day} - {self.time_slot}"
+        super().save(*args, **kwargs)
+
+
+
+
+
+
+
+
+

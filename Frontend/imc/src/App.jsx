@@ -17,14 +17,19 @@ import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
 import HeroCarousel from "./components/HeroCarousel";
 
-import UserDashboard from "./userDashboard/UserDashboard"; // ⬅️ make sure this file exists
+// User Dashboard
+import UserDashboard from "./userDashboard/UserDashboard";
+
+// Real forms
+import UserStudioBookingForm from "./userDashboard/Forms/UserStudioBookingForm";
+import UserPhotographyBookingForm from "./userDashboard/Forms/UserPhotographyBookingForm";
+import UserEvents from "./userDashboard/Forms/UserEvents"; // ⭐ NEW – events page
 
 import "./App.css";
-
 import Img1 from "./assets/banner.jpg";
 import Img2 from "./assets/banner1.jpg";
 
-// ---------- small helpers to read auth info ----------
+/* ----------------- Auth helpers ----------------- */
 const getUserInfo = () => {
   const token = localStorage.getItem("access");
   const rawUser = localStorage.getItem("user");
@@ -37,34 +42,26 @@ const getUserInfo = () => {
   return { token, user };
 };
 
-// only require logged in
+/* ----------------- Route guards ----------------- */
 function PrivateRoute({ children }) {
   const { token } = getUserInfo();
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
   return children;
 }
 
-// only allow admin / superuser for admin dashboard
 function AdminRoute({ children }) {
   const { token, user } = getUserInfo();
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token) return <Navigate to="/login" replace />;
 
   const role = (user?.role || "").toLowerCase();
   const isSuper = !!user?.is_superuser;
 
-  if (role === "admin" || isSuper) {
-    return children;
-  }
+  if (role === "admin" || isSuper) return children;
 
-  // normal users → send to user dashboard
   return <Navigate to="/user-dashboard" replace />;
 }
 
-// ---------- Hero for home ----------
+/* ----------------- Home Hero ----------------- */
 function HomeHero() {
   const slides = [
     {
@@ -82,16 +79,16 @@ function HomeHero() {
   return (
     <HeroCarousel
       images={slides}
-      interval={2000} // auto-slide every 2s
+      interval={2000}
       height="calc(100vh - 70px)"
     />
   );
 }
 
-// ---------- Layout with Navbar + Routes ----------
+/* ----------------- Layout ----------------- */
 function Layout() {
   const location = useLocation();
-  const showHero = location.pathname === "/"; // only on home page
+  const showHero = location.pathname === "/";
 
   return (
     <>
@@ -100,7 +97,7 @@ function Layout() {
 
       <main className="app-main">
         <Routes>
-          {/* Home – just hero */}
+          {/* Home */}
           <Route path="/" element={<div />} />
 
           {/* Auth */}
@@ -112,7 +109,7 @@ function Layout() {
             element={<ResetPasswordConfirm />}
           />
 
-          {/* Admin dashboard – protected by role */}
+          {/* Admin Dashboard */}
           <Route
             path="/dashboard"
             element={
@@ -122,7 +119,7 @@ function Layout() {
             }
           />
 
-          {/* User dashboard – any logged-in user */}
+          {/* User Dashboard */}
           <Route
             path="/user-dashboard"
             element={
@@ -132,12 +129,63 @@ function Layout() {
             }
           />
 
-          {/* Profile – any logged-in user (you can change to AdminRoute if needed) */}
+          {/* Profile */}
           <Route
             path="/profile"
             element={
               <PrivateRoute>
                 <ProfileSection />
+              </PrivateRoute>
+            }
+          />
+
+          {/* ----------------- Services ----------------- */}
+
+          {/* Studio Booking */}
+          <Route
+            path="/studio-booking"
+            element={
+              <PrivateRoute>
+                <UserStudioBookingForm />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Photography Booking */}
+          <Route
+            path="/photography-booking"
+            element={
+              <PrivateRoute>
+                <UserPhotographyBookingForm />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Events & Shows – NEW */}
+          <Route
+            path="/events-booking"
+            element={
+              <PrivateRoute>
+                <UserEvents />
+              </PrivateRoute>
+            }
+          />
+
+          {/* Placeholder (still TODO) */}
+          <Route
+            path="/videography-booking"
+            element={
+              <PrivateRoute>
+                <div style={{ padding: "2rem" }}>Videography Booking (TODO)</div>
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/sound-booking"
+            element={
+              <PrivateRoute>
+                <div style={{ padding: "2rem" }}>Sound Booking (TODO)</div>
               </PrivateRoute>
             }
           />
@@ -150,6 +198,7 @@ function Layout() {
   );
 }
 
+/* ----------------- App Root ----------------- */
 export default function App() {
   return (
     <Router>

@@ -117,3 +117,7 @@ class UserStudioBooking(models.Model):
             # you can allow past bookings if you want – then delete this check
             from django.core.exceptions import ValidationError
             raise ValidationError({"date": "Booking date cannot be in the past."})
+
+
+
+

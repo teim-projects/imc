@@ -189,12 +189,10 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
 
   // compute slot availability for the selected date & studio
   const slotsInfo = useMemo(() => {
-    // prepare baseline: all slots not booked
     const base = allSlots.map((s) => ({ time: s, booked: false, sources: [] }));
 
     if (!formData.date || !formData.studio_id) return base;
 
-    // bookings that match the date and studio (match by studio_id or name)
     const master = masters.find((m) => String(m.id) === String(formData.studio_id));
     const taken = bookings.filter(
       (b) =>
@@ -204,14 +202,12 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
           String(b.studio_id || "") === String(formData.studio_id))
     );
 
-    // mark booked slots by testing overlap between each slot start and existing bookings
     return base.map((slotObj) => {
       const overlappedBy = taken.filter((b) => {
-        // If booking has no time_slot, ignore
         if (!b.time_slot) return false;
         return overlaps(
           slotObj.time,
-          1 /* slot step in hours */,
+          1, // slot step in hours
           b.time_slot,
           Number(b.duration) || 1
         );
@@ -220,11 +216,10 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     });
   }, [allSlots, formData.date, formData.studio_id, bookings, masters]);
 
-  // helper: get index of a slot and compute range array by duration
   const computeRangeForStart = (startTime, durationHours) => {
     const stepMin = SLOT_STEP_MIN;
     const perSlotHr = stepMin / 60;
-    const count = Math.ceil((Number(durationHours) || 0) / perSlotHr) || 1; // number of slots needed
+    const count = Math.ceil((Number(durationHours) || 0) / perSlotHr) || 1;
     const startIndex = allSlots.indexOf(startTime);
     if (startIndex === -1) return [];
     const arr = [];
@@ -236,14 +231,12 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     return arr;
   };
 
-  // When duration or date/studio changes, clear selection range and time if it no longer fits
   useEffect(() => {
     if (!formData.time_slot) {
       setSelectedRange([]);
       return;
     }
     const range = computeRangeForStart(formData.time_slot, formData.duration);
-    // if range length is less than required (runs past end) or any covered slot booked, clear selection
     const perSlotHr = SLOT_STEP_MIN / 60;
     const neededCount = Math.ceil((Number(formData.duration) || 0) / perSlotHr) || 1;
     if (range.length < neededCount) {
@@ -294,19 +287,13 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     });
   };
 
-  // user clicking a slot as start: only allow when the computed range has no booked slot and fits
   const onSlotClick = (time) => {
-    // compute intended range
     const range = computeRangeForStart(time, formData.duration);
     const perSlotHr = SLOT_STEP_MIN / 60;
     const neededCount = Math.ceil((Number(formData.duration) || 0) / perSlotHr) || 1;
-    if (range.length < neededCount) {
-      // can't pick because it would run past end
-      return;
-    }
+    if (range.length < neededCount) return;
     const conflict = range.some((t) => slotsInfo.find((s) => s.time === t)?.booked);
-    if (conflict) return; // do nothing if conflict
-    // set start time and selectedRange
+    if (conflict) return;
     setFormData((p) => ({ ...p, time_slot: time }));
     setSelectedRange(range);
   };
@@ -328,7 +315,6 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
       time_slot: row.time_slot || "",
       duration: row.duration ?? 1,
       payment_methods: Array.isArray(row.payment_methods) ? row.payment_methods : [],
-      // use price_per_hour (fallback to price, then master hourly_rate)
       custom_price: row.price_per_hour ?? row.price ?? (master?.hourly_rate ?? ""),
     });
     setSelectedRange([]);
@@ -388,7 +374,6 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
       payment_methods: Array.isArray(formData.payment_methods)
         ? formData.payment_methods
         : [],
-      // send price_per_hour (and price for backward compatibility)
       price_per_hour: priceToSend,
       price: priceToSend,
       studio_name: formData.studio_name,
@@ -420,7 +405,6 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     }
   };
 
-  // helper to decide whether a given slot may be a valid start (fits and no conflicts)
   const canStartAt = (time) => {
     const range = computeRangeForStart(time, formData.duration);
     const perSlotHr = SLOT_STEP_MIN / 60;
@@ -429,249 +413,302 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
     return !range.some((t) => slotsInfo.find((s) => s.time === t)?.booked);
   };
 
+  // ---------- UI (Videography-style, reordered sections) ----------
   return (
-    <div className="form-container pro">
-      <div className="form-header">
-        <h3>🎙️ Studio Booking</h3>
-        {onClose && (
-          <button className="close-x" onClick={onClose} aria-label="Close">
-            ✖
+    <div className="pf-wrap">
+      {/* HEADER */}
+      <div className="pf-header">
+        <div>
+          <h2>Studio Booking</h2>
+          <p className="pf-subtitle">
+            Manage hourly studio reservations with smart time-slot blocking.
+          </p>
+        </div>
+        <div className="pf-tabs">
+          <button
+            className={tab === "ADD" ? "active" : ""}
+            onClick={() => setTab("ADD")}
+            type="button"
+          >
+            Add Booking
           </button>
-        )}
+          <button
+            className={tab === "VIEW" ? "active" : ""}
+            onClick={() => setTab("VIEW")}
+            type="button"
+          >
+            View Bookings
+          </button>
+          {onClose && (
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ marginLeft: "8px" }}
+              onClick={onClose}
+            >
+              Close
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="tabs" style={{ marginBottom: 8 }}>
-        <button
-          className={`tab ${tab === "ADD" ? "active" : ""}`}
-          onClick={() => setTab("ADD")}
-          type="button"
-        >
-          ➕ Add
-        </button>
-        <button
-          className={`tab ${tab === "VIEW" ? "active" : ""}`}
-          onClick={() => setTab("VIEW")}
-          type="button"
-        >
-          👁 View
-        </button>
-      </div>
-
-      {successMsg && <div className="banner success">{successMsg}</div>}
+      {/* BANNERS */}
       {error && (
-        <pre className="banner error" style={{ whiteSpace: "pre-wrap" }}>
+        <pre className="pf-banner pf-error" style={{ whiteSpace: "pre-wrap" }}>
           {error}
         </pre>
       )}
+      {successMsg && <div className="pf-banner pf-success">{successMsg}</div>}
 
+      {/* ADD FORM */}
       {tab === "ADD" && (
-        <form onSubmit={handleSubmit} className="grid two-col">
-          <div className="group">
-            <label>Customer Name *</label>
-            <input
-              name="customer"
-              value={formData.customer}
-              onChange={handleChange}
-              placeholder="e.g., Rahul Verma"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="pf-form">
+          {/* 1) CUSTOMER DETAILS */}
+          <section className="pf-card">
+            <h3>Customer Details</h3>
+            <div className="pf-grid">
+              <label>
+                Customer Name*
+                <input
+                  name="customer"
+                  value={formData.customer}
+                  onChange={handleChange}
+                  placeholder="e.g., Rahul Verma"
+                  required
+                />
+              </label>
 
-          <div className="group">
-            <label>Contact Number</label>
-            <input
-              name="contact_number"
-              value={formData.contact_number}
-              onChange={handleChange}
-              placeholder="+91XXXXXXXXXX"
-            />
-          </div>
+              <label>
+                Contact Number
+                <input
+                  name="contact_number"
+                  value={formData.contact_number}
+                  onChange={handleChange}
+                  placeholder="+91XXXXXXXXXX"
+                />
+              </label>
 
-          <div className="group">
-            <label>Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="customer@email.com"
-            />
-          </div>
+              <label>
+                Email
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="customer@email.com"
+                />
+              </label>
 
-          <div className="group">
-            <label>Address</label>
-            <input
-              name="address"
-              value={formData.address}
-              onChange={handleChange}
-              placeholder="Street, City"
-            />
-          </div>
+              <label>
+                Address
+                <input
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Street, City"
+                />
+              </label>
+            </div>
+          </section>
 
-          <div className="group">
-            <label>Studio Name *</label>
-            <select
-              name="studio_id"
-              value={formData.studio_id}
-              onChange={handleStudioChange}
-              required
-            >
-              <option value="">— Select studio —</option>
-              {masters.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} {m.hourly_rate ? `— ₹${m.hourly_rate}/hr` : ""}
-                </option>
-              ))}
-            </select>
-            <input type="hidden" name="studio_name" value={formData.studio_name} readOnly />
-          </div>
+          {/* 2) STUDIO & PRICING */}
+          <section className="pf-card">
+            <h3>Studio & Pricing</h3>
+            <div className="pf-grid">
+              <label>
+                Studio Name*
+                <select
+                  name="studio_id"
+                  value={formData.studio_id}
+                  onChange={handleStudioChange}
+                  required
+                >
+                  <option value="">— Select studio —</option>
+                  {masters.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} {m.hourly_rate ? `— ₹${m.hourly_rate}/hr` : ""}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="hidden"
+                  name="studio_name"
+                  value={formData.studio_name}
+                  readOnly
+                />
+              </label>
 
-          <div className="group">
-            <label>Price (₹/hr)</label>
-            <input
-              name="custom_price"
-              value={finalPrice}
-              onChange={(e) =>
-                handleChange({ target: { name: "custom_price", value: e.target.value } })
-              }
-              placeholder={masterPrice ? `Master: ₹${masterPrice}` : "Enter price"}
-            />
-          </div>
+              <label>
+                Price (₹/hr)
+                <input
+                  name="custom_price"
+                  value={finalPrice}
+                  onChange={(e) =>
+                    handleChange({
+                      target: {
+                        name: "custom_price",
+                        value: e.target.value,
+                        type: "text",
+                      },
+                    })
+                  }
+                  placeholder={masterPrice ? `Master: ₹${masterPrice}` : "Enter price"}
+                />
+              </label>
 
-          <div className="group">
-            <label>Date *</label>
-            <input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={(e) => {
-                handleChange(e);
-                setSelectedRange([]);
-                setFormData((p) => ({ ...p, time_slot: "" }));
-              }}
-              required
-            />
-          </div>
+              <label>
+                Duration (hours)*
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  name="duration"
+                  value={formData.duration}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setSelectedRange([]);
+                    setFormData((p) => ({ ...p, time_slot: "" }));
+                  }}
+                  placeholder="e.g., 2"
+                  required
+                />
+              </label>
 
-          <div className="group">
-            <label>Time Slot *</label>
-            <div className="slot-grid">
-              {!formData.date || !formData.duration || !formData.studio_id ? (
-                <div className="muted">Pick studio, date and duration first</div>
-              ) : (
-                <>
-                  {slotsInfo.filter((s) => !s.booked).length === 0 &&
-                  slotsInfo.length > 0 ? (
-                    <div className="empty">
-                      No free slots for the selected date/duration.
-                    </div>
-                  ) : null}
-
-                  <div
-                    className="slot-list"
-                    role="list"
-                    style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-                  >
-                    {slotsInfo.map(({ time, booked }) => {
-                      const isSelectedStart = formData.time_slot === time;
-                      const inSelectedRange = selectedRange.includes(time);
-                      const validStart = canStartAt(time);
-                      // style classes: booked, disabled-start, selected-start, selected-range
-                      const cls = [
-                        "slot",
-                        booked ? "booked" : "available",
-                        !booked && !validStart ? "disabled-start" : "",
-                        isSelectedStart ? "selected-start" : "",
-                        inSelectedRange ? "selected-range" : "",
-                      ].join(" ");
-
-                      const title = booked
-                        ? "Already booked"
-                        : inSelectedRange
-                        ? `Covers ${selectedRange.length} slot(s)`
-                        : `Start at ${format12(time)}`;
-                      return (
-                        <button
-                          key={time}
-                          type="button"
-                          role="listitem"
-                          className={cls}
-                          onClick={() => {
-                            if (booked) return;
-                            if (!validStart) return;
-                            onSlotClick(time);
-                          }}
-                          disabled={booked || !validStart}
-                          title={title}
-                        >
-                          <div style={{ fontWeight: 800 }}>{format12(time)}</div>
-                          {booked && (
-                            <div style={{ fontSize: 11, color: "#9aa6b2" }}>booked</div>
-                          )}
-                          {!booked && !validStart && (
-                            <div style={{ fontSize: 11, color: "#c07" }}>
-                              not enough free slots
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
+              <label>
+                Payment Options
+                <div className="pf-methods">
+                  <div className="pf-tags">
+                    {["Card", "UPI", "NetBanking"].map((m) => (
+                      <button
+                        type="button"
+                        key={m}
+                        className={
+                          formData.payment_methods.includes(m)
+                            ? "tag active"
+                            : "tag"
+                        }
+                        onClick={() => handlePaymentChange(m)}
+                      >
+                        {m}
+                      </button>
+                    ))}
                   </div>
-                </>
-              )}
+                </div>
+              </label>
             </div>
-          </div>
+          </section>
 
-          <div className="group">
-            <label>Duration (hours) *</label>
-            <input
-              type="number"
-              step="0.5"
-              min="0.5"
-              name="duration"
-              value={formData.duration}
-              onChange={(e) => {
-                handleChange(e);
-                setSelectedRange([]);
-                setFormData((p) => ({ ...p, time_slot: "" }));
-              }}
-              placeholder="e.g., 2"
-              required
-            />
-            <div style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
-              Selecting a start will highlight the full booked range based on duration.
+          {/* 3) SCHEDULE & SLOTS */}
+          <section className="pf-card">
+            <h3>Schedule & Slots</h3>
+            <div className="pf-grid">
+              <label>
+                Date*
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={(e) => {
+                    handleChange(e);
+                    setSelectedRange([]);
+                    setFormData((p) => ({ ...p, time_slot: "" }));
+                  }}
+                  required
+                />
+              </label>
+
+              <label>
+                Time Slot*
+                <div className="slot-grid">
+                  {!formData.date || !formData.duration || !formData.studio_id ? (
+                    <div className="muted">Pick studio, date and duration first</div>
+                  ) : (
+                    <>
+                      {slotsInfo.filter((s) => !s.booked).length === 0 &&
+                      slotsInfo.length > 0 ? (
+                        <div className="empty">
+                          No free slots for the selected date/duration.
+                        </div>
+                      ) : null}
+
+                      <div
+                        className="slot-list"
+                        role="list"
+                        style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+                      >
+                        {slotsInfo.map(({ time, booked }) => {
+                          const isSelectedStart = formData.time_slot === time;
+                          const inSelectedRange = selectedRange.includes(time);
+                          const validStart = canStartAt(time);
+                          const cls = [
+                            "slot",
+                            booked ? "booked" : "available",
+                            !booked && !validStart ? "disabled-start" : "",
+                            isSelectedStart ? "selected-start" : "",
+                            inSelectedRange ? "selected-range" : "",
+                          ].join(" ");
+
+                          const title = booked
+                            ? "Already booked"
+                            : inSelectedRange
+                            ? `Covers ${selectedRange.length} slot(s)`
+                            : `Start at ${format12(time)}`;
+                          return (
+                            <button
+                              key={time}
+                              type="button"
+                              role="listitem"
+                              className={cls}
+                              onClick={() => {
+                                if (booked) return;
+                                if (!validStart) return;
+                                onSlotClick(time);
+                              }}
+                              disabled={booked || !validStart}
+                              title={title}
+                            >
+                              <div style={{ fontWeight: 800 }}>
+                                {format12(time)}
+                              </div>
+                              {booked && (
+                                <div style={{ fontSize: 11, color: "#9aa6b2" }}>
+                                  booked
+                                </div>
+                              )}
+                              {!booked && !validStart && (
+                                <div style={{ fontSize: 11, color: "#c07" }}>
+                                  not enough free slots
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </label>
             </div>
-          </div>
+            <p style={{ fontSize: 12, color: "#6b7280", marginTop: 8 }}>
+              Selecting a start time will highlight the full reserved range based on
+              the duration.
+            </p>
+          </section>
 
-          <div className="group full">
-            <label>Payment Options</label>
-            <div className="payment-options pill">
-              {["Card", "UPI", "NetBanking"].map((m) => (
-                <label key={m} className="pill-item">
-                  <input
-                    type="checkbox"
-                    checked={formData.payment_methods.includes(m)}
-                    onChange={() => handlePaymentChange(m)}
-                  />
-                  <span>{m}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="actions full">
-            <button type="submit" className="primary" disabled={saving}>
+          {/* ACTIONS */}
+          <div className="pf-actions">
+            <button type="submit" className="btn" disabled={saving}>
               {saving
                 ? editingId
                   ? "Updating..."
                   : "Saving..."
                 : editingId
-                ? "Update"
-                : "Save"}
+                ? "Update Booking"
+                : "Create Booking"}
             </button>
             <button
               type="button"
-              className="ghost"
+              className="btn ghost"
               onClick={resetForm}
               disabled={saving}
             >
@@ -680,114 +717,117 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
           </div>
 
           {editingId && (
-            <div className="hint full">
+            <div className="pf-hint">
               Editing booking <strong>#{editingId}</strong>
             </div>
           )}
         </form>
       )}
 
+      {/* VIEW TABLE */}
       {tab === "VIEW" && (
-        <div className="view-wrap">
-          <div className="toolbar">
+        <div className="pf-table-card">
+          <div className="pf-table-top">
             <input
-              className="search"
+              className="pf-search"
               placeholder="Search: customer, studio, email, phone"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <input
               type="date"
-              className="date-filter"
+              className="pf-search"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
+              style={{ maxWidth: 180 }}
             />
-            <button className="ghost" onClick={fetchAll} disabled={loading}>
+            <button className="btn" onClick={fetchAll} disabled={loading}>
               {loading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
 
-          {loading ? (
-            <div className="loader">Loading bookings…</div>
-          ) : filtered.length === 0 ? (
-            <div className="empty">No bookings found.</div>
-          ) : (
-            <>
-              <div className="table-wrap">
-                <table className="nice-table">
-                  <thead>
-                    <tr>
-                      <th>Customer</th>
-                      <th>Studio</th>
-                      <th>Date</th>
-                      <th>Time</th>
-                      <th>Duration</th>
-                      <th>Price (₹/hr)</th>
-                      <th>Payment</th>
-                      <th className="right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paged.map((s) => (
-                      <tr key={s.id}>
-                        <td>{s.customer || "-"}</td>
-                        <td>{s.studio_name || "-"}</td>
-                        <td>{s.date || "-"}</td>
-                        <td>{s.time_slot ? format12(s.time_slot) : "-"}</td>
-                        <td>{s.duration || "-"}</td>
-                        <td>
-                          {s.price_per_hour !== undefined && s.price_per_hour !== null
-                            ? `₹${s.price_per_hour}`
-                            : s.price !== undefined && s.price !== null
-                            ? `₹${s.price}`
-                            : "-"}
-                        </td>
-                        <td>
-                          {Array.isArray(s.payment_methods) && s.payment_methods.length
-                            ? s.payment_methods.join(", ")
-                            : "-"}
-                        </td>
-                        <td className="right">
-                          <button
-                            className="mini"
-                            onClick={() => handleEdit(s)}
-                            disabled={saving}
-                          >
-                            ✏️ Edit
-                          </button>
-                          <button
-                            className="mini danger"
-                            onClick={() => handleDelete(s.id)}
-                            disabled={saving}
-                          >
-                            🗑 Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <div className="pf-table-wrap">
+            <table className="pf-table">
+              <thead>
+                <tr>
+                  <th>Customer</th>
+                  <th>Studio</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Duration</th>
+                  <th>Price (₹/hr)</th>
+                  <th>Payment</th>
+                  <th className="c">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.customer || "-"}</td>
+                    <td>{s.studio_name || "-"}</td>
+                    <td>{s.date || "-"}</td>
+                    <td>{s.time_slot ? format12(s.time_slot) : "-"}</td>
+                    <td>{s.duration || "-"}</td>
+                    <td>
+                      {s.price_per_hour !== undefined && s.price_per_hour !== null
+                        ? `₹${s.price_per_hour}`
+                        : s.price !== undefined && s.price !== null
+                        ? `₹${s.price}`
+                        : "-"}
+                    </td>
+                    <td>
+                      {Array.isArray(s.payment_methods) && s.payment_methods.length
+                        ? s.payment_methods.join(", ")
+                        : "-"}
+                    </td>
+                    <td className="c">
+                      <button
+                        className="mini"
+                        onClick={() => handleEdit(s)}
+                        disabled={saving}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="mini danger"
+                        onClick={() => handleDelete(s.id)}
+                        disabled={saving}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {!paged.length && (
+                  <tr>
+                    <td colSpan="8" className="c muted">
+                      {loading ? "Loading bookings…" : "No bookings found."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
-              <div className="pagination">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  ‹ Prev
-                </button>
-                <span>
-                  Page {page} / {totalPages}
-                </span>
-                <button
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  Next ›
-                </button>
-              </div>
-            </>
-          )}
+          <div className="pf-pager">
+            <button
+              className="mini"
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Prev
+            </button>
+            <span>
+              Page {page} / {totalPages}
+            </span>
+            <button
+              className="mini"
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

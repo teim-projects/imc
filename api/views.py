@@ -275,35 +275,66 @@ class WhoAmI(APIView):
 # Studios (bookings)
 # ====================================================================
 class StudioViewSet(viewsets.ModelViewSet):
+    """
+    CRUD API for Studio bookings.
+    Frontend is calling:  BASE + "/auth/studios/"
+    """
+
     queryset = Studio.objects.all()
     serializer_class = StudioSerializer
     pagination_class = DefaultPagination
+
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["studio_name", "customer", "email", "contact_number", "address", "payment_methods"]
+    search_fields = [
+        "studio_name",
+        "customer",
+        "email",
+        "contact_number",
+        "address",
+        "payment_methods",
+    ]
     ordering_fields = ["date", "time_slot", "duration", "created_at"]
     ordering = ["-date", "-time_slot"]
 
     @action(detail=False, methods=["get"])
     def upcoming(self, request):
+        """
+        GET /auth/studios/upcoming/?days=7
+
+        Returns upcoming bookings for the next N days (default 7).
+        """
         try:
             days = int(request.query_params.get("days", 7))
         except ValueError:
             days = 7
+
         today = now().date()
         qs = (
             self.get_queryset()
             .filter(date__gte=today, date__lte=today + timedelta(days=days))
             .order_by("date", "time_slot")
         )
-        return Response(self.get_serializer(qs, many=True).data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["get"])
     def by_date(self, request):
+        """
+        GET /auth/studios/by_date/?date=YYYY-MM-DD
+
+        Returns all bookings for a given date.
+        """
         target = request.query_params.get("date")
         if not target:
-            return Response({"error": "Missing 'date' parameter."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Missing 'date' parameter."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         qs = self.get_queryset().filter(date=target).order_by("time_slot")
-        return Response(self.get_serializer(qs, many=True).data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
 
 
 # ====================================================================
@@ -341,15 +372,18 @@ class PrivateBookingViewSet(viewsets.ModelViewSet):
 # Events
 # ====================================================================
 # api/views.py
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
+
 from .models import Event
 from .serializers import EventSerializer
 
+
 class EventViewSet(viewsets.ModelViewSet):
     """
-    CRUD API for Events (Live / Karaoke + tier prices)
+    CRUD API for Events (Live / Karaoke + time slot + seats + tier prices)
 
-    URL base: /auth/events/
+    Base URL: /auth/events/
+
     - GET    /auth/events/          -> list
     - POST   /auth/events/          -> create
     - GET    /auth/events/<id>/     -> retrieve
@@ -357,9 +391,38 @@ class EventViewSet(viewsets.ModelViewSet):
     - PATCH  /auth/events/<id>/     -> partial update
     - DELETE /auth/events/<id>/     -> delete
     """
-    queryset = Event.objects.all().order_by("-date", "-created_at")
+
+    queryset = Event.objects.all().order_by("-date", "time_slot", "-created_at")
     serializer_class = EventSerializer
+
+    # Public can view, only authenticated users can create/update/delete
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    # Search + ordering for your admin table UI
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+
+    search_fields = [
+        "title",
+        "location",
+        "description",
+        "event_type",
+    ]
+
+    ordering_fields = [
+        "date",
+        "time_slot",
+        "created_at",
+        "total_seats",      # ⭐ seats
+        "available_seats",  # ⭐ seats
+        "basic_price",
+        "premium_price",
+        "vip_price",
+        "ticket_price",
+    ]
+
+    # default ordering
+    ordering = ["-date", "time_slot"]
+
 
 
 
@@ -746,17 +809,15 @@ class DashboardSummary(APIView):
 
 
 
-
 # api/views.py
-# app_name/views.py
 from django.shortcuts import get_object_or_404
 
-from rest_framework import viewsets, permissions, status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 
-from .models import SingingClass   # your model name
+from .models import SingingClass
 from .serializers import SingingClassSerializer
 
 
@@ -767,7 +828,6 @@ class IsAdminOrReadOnly(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        # SAFE_METHODS = ('GET', 'HEAD', 'OPTIONS')
         if request.method in permissions.SAFE_METHODS:
             return True
         return bool(request.user and request.user.is_staff)
@@ -796,18 +856,36 @@ class SingingClassAdmissionViewSet(viewsets.ModelViewSet):
     destroy:  DELETE /auth/singing-classes/<pk>/
 
     Extra:
-    status:   PATCH  /auth/singing-classes/<pk>/status/
-              body: { "status": "confirmed" }
+      PATCH /auth/singing-classes/<pk>/status/
+            body: { "status": "confirmed" }
+
+      GET   /auth/singing-classes/by-slot/?day=Monday&time_slot=07:00%20-%2008:00
     """
 
     queryset = SingingClass.objects.all().order_by("-created_at")
     serializer_class = SingingClassSerializer
 
-    # if you want public creation/use -> AllowAny
-    # if you want only logged-in -> IsAuthenticated
+    # If you want public creation/use -> AllowAny
+    # If you want only logged-in -> IsAuthenticated
     permission_classes = [permissions.AllowAny]
 
     pagination_class = SingingClassPagination
+
+    # Search + ordering (optional but useful for table)
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "first_name",
+        "last_name",
+        "phone",
+        "email",
+        "city",
+        "preferred_batch",
+        "day",
+        "time_slot",
+        "status",
+    ]
+    ordering_fields = ["date", "created_at", "fee"]
+    ordering = ["-created_at"]
 
     # Example extra action to update status (only for staff)
     @action(
@@ -845,13 +923,36 @@ class SingingClassAdmissionViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=False, methods=["get"], url_path="by-slot")
+    def by_slot(self, request):
+        """
+        GET /auth/singing-classes/by-slot/?day=Monday&time_slot=07:00%20-%2008:00
+
+        Filters admissions by day and/or time_slot.
+        Both parameters are optional; if none passed, returns all.
+        """
+        day = request.query_params.get("day")
+        slot = request.query_params.get("time_slot")
+
+        qs = self.get_queryset()
+        if day:
+            qs = qs.filter(day=day)
+        if slot:
+            qs = qs.filter(time_slot=slot)
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         """
         Called on POST /auth/singing-classes/
 
-        fee + payment_method are already validated in SingingClassSerializer,
-        so just save.
-        If you later add a user FK, you can do:
-          serializer.save(user=self.request.user)
+        fee + payment_method + day + time_slot are validated in SingingClassSerializer,
+        and the model's save() will auto-fill preferred_batch = "Day - Slot".
         """
         serializer.save()

@@ -194,16 +194,28 @@ class StudioMasterSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------
 # Studio Booking
 # ---------------------------------------------------------------------
+from rest_framework import serializers
+from .models import Studio
+
+
 class StudioSerializer(serializers.ModelSerializer):
     # Expose payment_methods as a list to the UI
     payment_methods = serializers.ListField(
         child=serializers.CharField(),
         required=False,
-        allow_empty=True
+        allow_empty=True,
+    )
+
+    # Optional: computed total price (read-only, uses @property total_price on model)
+    total_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
     )
 
     class Meta:
         model = Studio
+        # include all model fields; total_price is added as extra serializer field above
         fields = "__all__"
         read_only_fields = ("created_at", "updated_at")
         extra_kwargs = {
@@ -213,16 +225,19 @@ class StudioSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         data = data.copy()
 
+        # Allow frontend to send payment_methods as CSV string OR list
         pm = data.get("payment_methods")
         if isinstance(pm, str):
             data["payment_methods"] = [s.strip() for s in pm.split(",") if s.strip()]
 
+        # Treat empty string as null for time_slot
         if data.get("time_slot", None) == "":
             data["time_slot"] = None
 
         return super().to_internal_value(data)
 
     def validate_contact_number(self, value):
+        # assumes you have _validate_phone imported somewhere above
         return _validate_phone(value)
 
     def validate_duration(self, value):
@@ -233,6 +248,7 @@ class StudioSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         pm = validated_data.pop("payment_methods", [])
         obj = Studio(**validated_data)
+        # store CSV in model
         obj.payment_methods = ", ".join(pm) if pm else ""
         obj.full_clean()
         obj.save()
@@ -250,8 +266,11 @@ class StudioSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep["payment_methods"] = instance.payment_list  # uses model property
+        # frontend gets list, not CSV
+        rep["payment_methods"] = instance.payment_list
         return rep
+
+
 
 
 # ---------------------------------------------------------------------
@@ -320,35 +339,85 @@ class PhotographyBookingSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------
 # Event / Show
 # ---------------------------------------------------------------------
+# api/serializers.py
+# api/serializers.py
+# api/serializers.py
+from rest_framework import serializers
+from .models import Event
+
+
 class EventSerializer(serializers.ModelSerializer):
-  class Meta:
-    model = Event
-    fields = [
-      "id",
-      "title",
-      "location",
-      "date",
-      "event_type",
-      "ticket_price",   # optional legacy field
-      "basic_price",
-      "premium_price",
-      "vip_price",
-      "description",
-      "created_at",
-    ]
-    read_only_fields = ["id", "created_at"]
+    class Meta:
+        model = Event
+        fields = [
+            "id",
+            "title",
+            "location",
+            "date",
+            "time_slot",
+            "event_type",
+            "total_seats",
+            "available_seats",
+            "basic_seats",
+            "premium_seats",
+            "vip_seats",
+            "ticket_price",
+            "basic_price",
+            "premium_price",
+            "vip_price",
+            "description",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
 
-  def validate(self, attrs):
-    # Enforce non-negative prices if provided
-    for field in ["ticket_price", "basic_price", "premium_price", "vip_price"]:
-      value = attrs.get(
-        field,
-        getattr(self.instance, field, None) if self.instance else None,
-      )
-      if value is not None and value < 0:
-        raise serializers.ValidationError({field: "Must be ≥ 0."})
-    return attrs
+    def validate(self, attrs):
+        instance = getattr(self, "instance", None)
 
+        def current(field):
+            if field in attrs:
+                return attrs[field]
+            return getattr(instance, field, None) if instance else None
+
+        # prices
+        for field in ["ticket_price", "basic_price", "premium_price", "vip_price"]:
+            val = current(field)
+            if val is not None and val < 0:
+                raise serializers.ValidationError({field: "Must be ≥ 0."})
+
+        # seats
+        total = current("total_seats") or 0
+        available = current("available_seats") or 0
+        basic = current("basic_seats") or 0
+        premium = current("premium_seats") or 0
+        vip = current("vip_seats") or 0
+
+        for field_name, val in [
+            ("total_seats", total),
+            ("available_seats", available),
+            ("basic_seats", basic),
+            ("premium_seats", premium),
+            ("vip_seats", vip),
+        ]:
+            if val < 0:
+                raise serializers.ValidationError({field_name: "Must be ≥ 0."})
+
+        if available > total:
+            raise serializers.ValidationError(
+                {"available_seats": "Available seats cannot be more than total seats."}
+            )
+
+        if basic + premium + vip > total:
+            raise serializers.ValidationError(
+                {"basic_seats": "Sum of tier seats cannot exceed total seats."}
+            )
+
+        return attrs
+
+    def create(self, validated_data):
+        total = validated_data.get("total_seats", 0)
+        if validated_data.get("available_seats") is None:
+            validated_data["available_seats"] = total
+        return super().create(validated_data)
 
 
 # ---------------------------------------------------------------------
@@ -506,7 +575,7 @@ class CustomUserDetailsSerializer(UserDetailsSerializer):
     profile_photo = serializers.ImageField(read_only=True, use_url=True, allow_null=True, required=False)
 
     class Meta:
-        model = CustomUser
+        model = User       
         fields = ('id', 'email', 'mobile_no', 'first_name', 'last_name', 'role', 'profile_photo')
         read_only_fields = ('email',)
 
@@ -703,57 +772,49 @@ class SingerSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------
 # Singing class  (Service)
 # ---------------------------------------------------------------------
-
 # api/serializers.py
+import re
 from rest_framework import serializers
 from .models import SingingClass
 
 
 class SingingClassSerializer(serializers.ModelSerializer):
-    date = serializers.DateField(read_only=True)
-    created_at = serializers.DateTimeField(read_only=True)
+    """
+    Serializer for SingingClass.
+    Exposes: day, time_slot, preferred_batch, fee, etc.
+    """
 
     class Meta:
         model = SingingClass
-        fields = [
-            "id",
-            "first_name",
-            "last_name",
-            "phone",
-            "email",          # still included, but optional
-            "address1",
-            "address2",
-            "city",
-            "state",
-            "postal_code",
-            "preferred_batch",
-            "reference_by",
-            "fee",
-            "payment_method",
-            "agreed_terms",
-            "status",
-            "date",
-            "created_at",
-        ]
-        read_only_fields = ("id", "date", "created_at")
-        extra_kwargs = {
-            # 👇 EMAIL OPTIONAL
-            "email": {
-                "required": False,
-                "allow_blank": True,
-                "allow_null": True,
-            }
-        }
+        fields = "__all__"
+        read_only_fields = ("date", "created_at")
+
+    def validate_phone(self, value):
+        if not value:
+            raise serializers.ValidationError("Phone is required.")
+        # very loose validation: digits, +, space, dash
+        if not re.match(r"^[0-9+\-\s]{8,20}$", value):
+            raise serializers.ValidationError("Enter a valid phone number.")
+        return value
 
     def validate_fee(self, value):
-        if value is None:
-            raise serializers.ValidationError("Fee is required.")
-        if value < 0:
-            raise serializers.ValidationError("Fee must be a positive amount.")
+        if value is None or value < 0:
+            raise serializers.ValidationError("Fee must be ≥ 0.")
         return value
 
-    def validate_payment_method(self, value):
-        valid = [c[0] for c in SingingClass.PaymentMethod.choices]
-        if value not in valid:
-            raise serializers.ValidationError("Invalid payment method.")
-        return value
+    def validate(self, attrs):
+        # Ensure day + time_slot present
+        day = attrs.get("day") or getattr(self.instance, "day", None)
+        slot = attrs.get("time_slot") or getattr(self.instance, "time_slot", None)
+        if not day:
+            raise serializers.ValidationError({"day": "Day is required."})
+        if not slot:
+            raise serializers.ValidationError({"time_slot": "Time slot is required."})
+
+        # Ensure terms accepted on create
+        agreed = attrs.get("agreed_terms")
+        if self.instance is None and not agreed:
+            raise serializers.ValidationError(
+                {"agreed_terms": "You must accept terms & conditions."}
+            )
+        return attrs

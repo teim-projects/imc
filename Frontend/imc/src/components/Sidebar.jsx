@@ -1,156 +1,200 @@
-// ---------- Sidebar.jsx (updated) ----------
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+// ---------- Sidebar.jsx (NO VISIBLE SUBMENUS, FORMS OPEN ON CLICK) ----------
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+} from "react";
 import "./Sidebar.css";
 import {
-  FaMusic, FaCalendarAlt, FaEnvelope, FaUser, FaChartLine, FaTools, FaLock,
-  FaCamera, FaVideo, FaVolumeUp, FaMoneyBill, FaBars, FaTimes, FaBuilding
+  FaMusic,
+  FaCalendarAlt,
+  FaEnvelope,
+  FaUser,
+  FaChartLine,
+  FaTools,
+  FaLock,
+  FaCamera,
+  FaVideo,
+  FaVolumeUp,
+  FaMoneyBill,
+  FaBars,
+  FaTimes,
+  FaBuilding,
 } from "react-icons/fa";
 
 function Sidebar({ openModal, openSubModal, currentKey = null }) {
   const [activeName, setActiveName] = useState("Overview");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [expandedItem, setExpandedItem] = useState(null);
 
   const _openModal = openModal || (() => {});
   const _openSubModal = openSubModal || (() => {});
 
-  // mapping submenu action keys -> parent key
-  const subKeyToParent = useMemo(() => ({
-    addStudio: "studio", viewStudio: "studio",
-    addStudioMaster: "studioMaster", viewStudioMaster: "studioMaster",
- 
-    addEvent: "eventsShows", viewEvent: "eventsShows",
-    
-    addPrivate: "private", viewPrivate: "private",
-    addPhotography: "photography", viewPhotography: "photography",
-    addVideography: "videography", viewVideography: "videography",
-    addSinger: "singer", viewSinger: "singer",
-    addPayment: "payment", viewPayment: "payment",
-    // singing classes
-    addClass: "classes", viewClass: "classes",
-  }), []);
+  // All sidebar items: either use `modal` or `subActionKey`
+  const menuItems = useMemo(
+    () => [
+      {
+        name: "Overview",
+        key: "overview",
+        icon: <FaChartLine />,
+        modal: "overview",    // if you don't have overview modal, you can set this to null
+        subActionKey: null,
+      },
 
-  const menuItems = useMemo(() => [
-    { name: "Overview", key: "overview", icon: <FaChartLine />, modal: null, submenu: null },
+      {
+        name: "Studio Master",
+        key: "studioMaster",
+        icon: <FaBuilding />,
+        modal: null,
+        // reuse your old logic: openSubModal("addStudioMaster")
+        subActionKey: "addStudioMaster",
+      },
 
-    {
-      name: "Studio Master",
-      key: "studioMaster",
-      icon: <FaBuilding />,
-      modal: "studioMaster",
-      submenu: [
-        { label: "➕ Add Studio (Master)", actionKey: "addStudioMaster" },
-        { label: "👁 View Studios (Master)", actionKey: "viewStudioMaster" },
-      ],
-    },
+      {
+        name: "Studio Booking",
+        key: "studio",
+        icon: <FaMusic />,
+        modal: null,
+        subActionKey: "addStudio",          // used to be submenu -> addStudio
+      },
 
-    { name: "Studio Booking", key: "studio", icon: <FaMusic />, submenu: [{ label: "➕ Add Info", actionKey: "addStudio" }] },
+      {
+        name: "Singing Classes",
+        key: "equipment",
+        icon: <FaTools />,
+        modal: null,
+        subActionKey: "addEquipment",       // or "addClass" if your parent uses that
+      },
 
-    { name: "Singing Classes", key: "equipment", icon: <FaTools />, submenu: [{ label: "➕ Add Info", actionKey: "addEquipment" }] },
+      {
+        name: "Auditorium Music Shows",
+        key: "eventsShows",
+        icon: <FaCalendarAlt />,
+        modal: null,
+        subActionKey: "addEvent",           // 🔴 this opens your Event form
+      },
 
-    { name: "Auditorium Music Shows", key: "eventsShows", icon: <FaCalendarAlt />, submenu: [
-        { label: "➕ Event", actionKey: "addEvent" },
+      {
+        name: "Private Music Events",
+        key: "private",
+        icon: <FaLock />,
+        modal: null,
+        subActionKey: "addPrivate",
+      },
 
-      ] },
+      {
+        name: "Photography Service",
+        key: "photography",
+        icon: <FaCamera />,
+        modal: null,
+        subActionKey: "addPhotography",
+      },
 
-    { name: "Private Music Events ", key: "private", icon: <FaLock />, submenu: [{ label: "➕ Add Info", actionKey: "addPrivate" }] },
+      {
+        name: "Videography Service",
+        key: "videography",
+        icon: <FaVideo />,
+        modal: null,
+        subActionKey: "addVideography",
+      },
 
-    { name: "Photography Service ", key: "photography", icon: <FaCamera />, submenu: [{ label: "➕ Add Info", actionKey: "addPhotography" }] },
+      {
+        name: "Sound System Service",
+        key: "sound",
+        icon: <FaVolumeUp />,
+        modal: null,
+        subActionKey: "addSound",           // use this in parent to show Sound form
+      },
 
-    {
-      name: "Videography Service ",
-      key: "videography",
-      icon: <FaVideo />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addVideography" },
-        
-      ],
-    },
+      {
+        name: "Singer Management",
+        key: "singer",
+        icon: <FaUser />,
+        modal: null,
+        subActionKey: "addSinger",
+      },
 
-    { name: "Sound System Service", key: "sound", icon: <FaVolumeUp />, modal: "sound", submenu: null },
+      {
+        name: "Payments",
+        key: "payment",
+        icon: <FaMoneyBill />,
+        modal: null,
+        subActionKey: "addPayment",
+      },
 
-    {
-      name: "Singer Management",
-      key: "singer",
-      icon: <FaUser />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addSinger" },
-        
-      ],
-    },
-
-    {
-      name: "Payments",
-      key: "payment",
-      icon: <FaMoneyBill />,
-      submenu: [
-        { label: "➕ Add Info", actionKey: "addPayment" },
-        
-      ],
-    },
-
-    // 
-
-    { name: "Contact", key: "contact", icon: <FaEnvelope />, modal: "contact", submenu: null },
-  ], []);
+      {
+        name: "Contact",
+        key: "contact",
+        icon: <FaEnvelope />,
+        modal: "contact",                   // normal modal
+        subActionKey: null,
+      },
+    ],
+    []
+  );
 
   const goHome = useCallback(() => {
     setActiveName("Overview");
-    setExpandedItem(null);
-    _openModal(null);
+    // if you want clicking IMC to open overview:
+    if (menuItems[0]?.modal) {
+      _openModal(menuItems[0].modal);
+    } else {
+      _openModal(null);
+    }
     setMobileOpen(false);
-  }, [_openModal]);
+  }, [_openModal, menuItems]);
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "auto";
   }, [mobileOpen]);
 
+  // If parent passes currentKey, highlight corresponding item
   useEffect(() => {
     if (!currentKey) return;
-    const parent = subKeyToParent[currentKey];
-    if (parent) setExpandedItem(parent);
-  }, [currentKey, subKeyToParent]);
-
-  const toggleExpand = (key) => setExpandedItem((curr) => (curr === key ? null : key));
+    const found = menuItems.find(
+      (item) =>
+        item.key === currentKey ||
+        item.modal === currentKey ||
+        item.subActionKey === currentKey
+    );
+    if (found) setActiveName(found.name);
+  }, [currentKey, menuItems]);
 
   const handleItemClick = (item) => {
-    const hasSub = !!(item.submenu && item.submenu.length);
     setActiveName(item.name);
 
-    if (hasSub) {
-      const willExpand = expandedItem !== item.key;
-      toggleExpand(item.key);
-      _openModal(null);
+    if (item.subActionKey) {
+      // forms that used to be opened with submenus (addStudio, addEvent, etc.)
+      _openSubModal(item.subActionKey);
+    } else if (item.modal) {
+      _openModal(item.modal);
     } else {
-      setExpandedItem(null);
-      if (item.modal !== undefined) _openModal(item.modal);
-      else _openModal(null);
+      _openModal(null);
     }
+
     setMobileOpen(false);
   };
-
-  const handleSubClick = (e, actionKey) => {
-    e.preventDefault();
-    e.stopPropagation();
-    _openSubModal(actionKey);
-    setMobileOpen(false);
-  };
-
-  const isItemExpanded = (item) =>
-    expandedItem === item.key || (!!currentKey && subKeyToParent[currentKey] === item.key);
 
   return (
     <>
       {/* Mobile Header */}
       <div className="mobile-header">
-        <h2 className="mobile-title" onClick={goHome}>IMC</h2>
-        <button className="mobile-menu-btn" onClick={() => setMobileOpen(!mobileOpen)}>
+        <h2 className="mobile-title" onClick={goHome}>
+          IMC
+        </h2>
+        <button
+          className="mobile-menu-btn"
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
           {mobileOpen ? <FaTimes /> : <FaBars />}
         </button>
       </div>
 
-      <div className={`sidebar-overlay ${mobileOpen ? "active" : ""}`} onClick={() => setMobileOpen(false)} />
+      <div
+        className={`sidebar-overlay ${mobileOpen ? "active" : ""}`}
+        onClick={() => setMobileOpen(false)}
+      />
 
       <aside
         className={`sidebar ${mobileOpen ? "open" : ""} ${
@@ -164,31 +208,20 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
         </div>
 
         <ul className="sidebar-menu">
-          {menuItems.map((item) => {
-            const hasSub = !!item.submenu?.length;
-            const expanded = hasSub ? isItemExpanded(item) : false;
-
-            return (
-              <li key={item.key} className={activeName === item.name ? "active" : ""}>
-                <button className="sidebar-btn" onClick={() => handleItemClick(item)}>
-                  <div className="icon">{item.icon}</div>
-                  <span className="text">{item.name}</span>
-                  {hasSub && <span className={`caret ${expanded ? "open" : ""}`}>▾</span>}
-                </button>
-
-                {hasSub && expanded && (
-                  <div className="submenu">
-                    {item.submenu.map((sub) => (
-                      <button key={sub.actionKey} className="submenu-btn"
-                        onClick={(e) => handleSubClick(e, sub.actionKey)}>
-                        {sub.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </li>
-            );
-          })}
+          {menuItems.map((item) => (
+            <li
+              key={item.key}
+              className={activeName === item.name ? "active" : ""}
+            >
+              <button
+                className="sidebar-btn"
+                onClick={() => handleItemClick(item)}
+              >
+                <div className="icon">{item.icon}</div>
+                <span className="text">{item.name}</span>
+              </button>
+            </li>
+          ))}
         </ul>
       </aside>
     </>
@@ -196,4 +229,3 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
 }
 
 export default Sidebar;
-

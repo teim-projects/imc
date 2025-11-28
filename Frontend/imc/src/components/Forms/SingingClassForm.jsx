@@ -31,10 +31,24 @@ const humanizeErr = (err) => {
   return err?.message || "Unknown error";
 };
 
-const BATCH_OPTIONS = [
-  "Morning (7:00 - 9:00)",
-  "Afternoon (1:00 - 3:00)",
-  "Evening (6:00 - 8:00)",
+// Day + Time Slot options
+const DAY_OPTIONS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const TIME_SLOT_OPTIONS = [
+  "07:00 - 08:00",
+  "08:00 - 09:00",
+  "16:00 - 17:00",
+  "17:00 - 18:00",
+  "18:00 - 19:00",
+  "19:00 - 20:00",
 ];
 
 const PAYMENT_OPTIONS = [
@@ -44,7 +58,7 @@ const PAYMENT_OPTIONS = [
 ];
 
 export default function SingingClassForm({ onSuccess }) {
-  const [mode, setMode] = useState("add"); // "add" or "view"
+  const [tab, setTab] = useState("ADD"); // "ADD" or "VIEW"
 
   const [form, setForm] = useState({
     first_name: "",
@@ -56,7 +70,8 @@ export default function SingingClassForm({ onSuccess }) {
     city: "",
     state: "",
     postal_code: "",
-    preferred_batch: "",
+    day: "",
+    time_slot: "",
     reference_by: "",
     fee: "",
     payment_method: "",
@@ -71,18 +86,19 @@ export default function SingingClassForm({ onSuccess }) {
   const [page, setPage] = useState(1);
   const [count, setCount] = useState(0);
   const [errorBanner, setErrorBanner] = useState("");
+  const [search, setSearch] = useState("");
+
   const [selected, setSelected] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // initial list load (so right card has data even in add mode)
+  // initial list load
   useEffect(() => {
     fetchList(1);
   }, []);
 
-  // fetch list when switching to view
   useEffect(() => {
-    if (mode === "view") fetchList(1);
-  }, [mode]);
+    if (tab === "VIEW") fetchList(1);
+  }, [tab]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -94,7 +110,6 @@ export default function SingingClassForm({ onSuccess }) {
   const setPayment = (key) => {
     setForm((f) => ({
       ...f,
-      // click again to unselect
       payment_method: f.payment_method === key ? "" : key,
     }));
     setErrors((s) => ({ ...s, payment_method: undefined }));
@@ -105,9 +120,9 @@ export default function SingingClassForm({ onSuccess }) {
     if (!form.first_name.trim()) e.first_name = "First name is required";
     if (!form.last_name.trim()) e.last_name = "Last name is required";
     if (!form.phone.trim()) e.phone = "Phone is required";
-    // email is OPTIONAL now – no check here
 
-    if (!form.preferred_batch) e.preferred_batch = "Please choose a batch";
+    if (!form.day) e.day = "Please choose a day";
+    if (!form.time_slot) e.time_slot = "Please choose a time slot";
 
     if (!form.fee.toString().trim()) {
       e.fee = "Fee is required";
@@ -116,8 +131,8 @@ export default function SingingClassForm({ onSuccess }) {
     }
 
     if (!form.payment_method) e.payment_method = "Select a payment option";
-
     if (!form.agreed_terms) e.agreed_terms = "You must accept terms";
+
     return e;
   };
 
@@ -132,7 +147,8 @@ export default function SingingClassForm({ onSuccess }) {
       city: "",
       state: "",
       postal_code: "",
-      preferred_batch: "",
+      day: "",
+      time_slot: "",
       reference_by: "",
       fee: "",
       payment_method: "",
@@ -144,22 +160,32 @@ export default function SingingClassForm({ onSuccess }) {
 
   const submit = async (ev) => {
     ev.preventDefault();
-    if (mode !== "add") return;
+    if (tab !== "ADD") return;
+
     const e = validate();
     if (Object.keys(e).length) {
       setErrors(e);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+
+    const preferred_batch =
+      form.day && form.time_slot ? `${form.day} - ${form.time_slot}` : "";
+
+    const payload = {
+      ...form,
+      preferred_batch,
+    };
+
     setSaving(true);
     setErrorBanner("");
     try {
-      const resp = await api.post(API_URL, form);
+      const resp = await api.post(API_URL, payload);
       await fetchList(1);
       resetForm();
       onSuccess?.();
       console.info("Saved admission id:", resp.data?.id);
-      setMode("view");
+      setTab("VIEW");
     } catch (err) {
       if (err?.response?.data) {
         const mapped = {};
@@ -230,13 +256,14 @@ export default function SingingClassForm({ onSuccess }) {
       city: row.city || "",
       state: row.state || "",
       postal_code: row.postal_code || "",
-      preferred_batch: row.preferred_batch || "",
+      day: row.day || "",
+      time_slot: row.time_slot || "",
       reference_by: row.reference_by || "",
       fee: row.fee || "",
       payment_method: row.payment_method || "",
       agreed_terms: !!row.agreed_terms,
     });
-    setMode("add");
+    setTab("ADD");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -249,429 +276,429 @@ export default function SingingClassForm({ onSuccess }) {
     setTimeout(() => setSelected(null), 220);
   };
 
-  const previewData = useMemo(
-    () => [
-      {
-        id: "p1",
-        first_name: "Om",
-        last_name: "Sharma",
-        preferred_batch: "Morning (7:00 - 9:00)",
-        phone: "+911234567890",
-        email: "om@gmail.com",
-        city: "Delhi",
-        date: "2025-05-12",
-        fee: "1500",
-        payment_method: "upi",
-      },
-    ],
-    []
-  );
-
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
-  const sidebarList = items.length > 0 ? items : previewData;
+
+  const filteredItems = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return items;
+    return items.filter((r) => {
+      const hay = `${r.first_name || ""} ${r.last_name || ""} ${r.phone || ""} ${
+        r.email || ""
+      } ${r.day || ""} ${r.time_slot || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [items, search]);
 
   return (
-    <div className="sc-wrapper-large">
-      <div className="sc-shell">
-        {/* Header & pills */}
-        <div className="sc-top header-with-pills">
-          <div className="title-left">
-            <div className="title-icon">🎤</div>
-            <div>
-              <h2>Admissions</h2>
-            </div>
-          </div>
-
-          <div className="pills">
-            <button
-              className={`pill pill-add ${mode === "add" ? "active" : ""}`}
-              onClick={() => setMode("add")}
-              type="button"
-              aria-pressed={mode === "add"}
-            >
-              <span className="pill-icon">＋</span>
-              <span className="pill-text">Add Admission</span>
-            </button>
-
-            <button
-              className={`pill pill-view ${mode === "view" ? "active" : ""}`}
-              onClick={() => setMode("view")}
-              type="button"
-              aria-pressed={mode === "view"}
-            >
-              <span className="pill-text">View Admissions</span>
-            </button>
-          </div>
+    <div className="pf-wrap">
+      {/* HEADER */}
+      <div className="pf-header">
+        <div>
+          <h2>Singing Class Admissions</h2>
+          <p className="pf-subtitle">
+            Enroll students into fixed batches with day &amp; time slots.
+          </p>
         </div>
+        <div className="pf-tabs">
+          <button
+            className={tab === "ADD" ? "active" : ""}
+            onClick={() => setTab("ADD")}
+            type="button"
+          >
+            Add Admission
+          </button>
+          <button
+            className={tab === "VIEW" ? "active" : ""}
+            onClick={() => setTab("VIEW")}
+            type="button"
+          >
+            View Admissions
+          </button>
+        </div>
+      </div>
 
-        {errorBanner && <div className="banner error">{errorBanner}</div>}
+      {/* BANNERS */}
+      {errorBanner && (
+        <div className="pf-banner pf-error" style={{ whiteSpace: "pre-wrap" }}>
+          {errorBanner}
+        </div>
+      )}
 
-        {/* ADD mode */}
-        {mode === "add" && (
-          <div className="sc-body">
-            <div className="sc-left">
-              <form className="sc-form-grid" onSubmit={submit} noValidate>
-                <div className="sc-col">
-                  <label>Customer Name *</label>
-                  <input
-                    name="first_name"
-                    placeholder="First name"
-                    value={form.first_name}
-                    onChange={handleChange}
-                  />
-                  {errors.first_name && (
-                    <div className="sc-err">{errors.first_name}</div>
-                  )}
-                </div>
+      {/* ADD MODE (pf style) */}
+      {tab === "ADD" && (
+        <form className="pf-form" onSubmit={submit} noValidate>
+          {/* 1) STUDENT DETAILS */}
+          <section className="pf-card">
+            <h3>Student Details</h3>
+            <div className="pf-grid">
+              <label>
+                First Name*
+                <input
+                  name="first_name"
+                  placeholder="First name"
+                  value={form.first_name}
+                  onChange={handleChange}
+                />
+                {errors.first_name && (
+                  <div className="field-error">{errors.first_name}</div>
+                )}
+              </label>
 
-                <div className="sc-col">
-                  <label>&nbsp;</label>
-                  <input
-                    name="last_name"
-                    placeholder="Last name"
-                    value={form.last_name}
-                    onChange={handleChange}
-                  />
-                  {errors.last_name && (
-                    <div className="sc-err">{errors.last_name}</div>
-                  )}
-                </div>
+              <label>
+                Last Name*
+                <input
+                  name="last_name"
+                  placeholder="Last name"
+                  value={form.last_name}
+                  onChange={handleChange}
+                />
+                {errors.last_name && (
+                  <div className="field-error">{errors.last_name}</div>
+                )}
+              </label>
 
-                <div className="sc-col">
-                  <label>Contact Number *</label>
-                  <input
-                    name="phone"
-                    placeholder="+91XXXXXXXXXX"
-                    value={form.phone}
-                    onChange={handleChange}
-                  />
-                  {errors.phone && <div className="sc-err">{errors.phone}</div>}
-                </div>
+              <label>
+                Contact Number*
+                <input
+                  name="phone"
+                  placeholder="+91XXXXXXXXXX"
+                  value={form.phone}
+                  onChange={handleChange}
+                />
+                {errors.phone && (
+                  <div className="field-error">{errors.phone}</div>
+                )}
+              </label>
 
-                <div className="sc-col">
-                  {/* 👉 Email clearly optional */}
-                  <label>Email (optional)</label>
-                  <input
-                    name="email"
-                    placeholder="customer@email.com"
-                    value={form.email}
-                    onChange={handleChange}
-                  />
-                  {errors.email && <div className="sc-err">{errors.email}</div>}
-                </div>
+              <label>
+                Email (optional)
+                <input
+                  name="email"
+                  placeholder="customer@email.com"
+                  value={form.email}
+                  onChange={handleChange}
+                />
+                {errors.email && (
+                  <div className="field-error">{errors.email}</div>
+                )}
+              </label>
 
-                <div className="sc-col">
-                  <label>Street Address</label>
-                  <input
-                    name="address1"
-                    placeholder="Street, City"
-                    value={form.address1}
-                    onChange={handleChange}
-                  />
-                </div>
+              <label>
+                Street Address
+                <input
+                  name="address1"
+                  placeholder="Street, City"
+                  value={form.address1}
+                  onChange={handleChange}
+                />
+              </label>
 
-                <div className="sc-col">
-                  <label>Address Line 2</label>
-                  <input
-                    name="address2"
-                    placeholder="Apartment / Landmark"
-                    value={form.address2}
-                    onChange={handleChange}
-                  />
-                </div>
+              <label>
+                Address Line 2
+                <input
+                  name="address2"
+                  placeholder="Apartment / Landmark"
+                  value={form.address2}
+                  onChange={handleChange}
+                />
+              </label>
 
-                <div className="sc-col">
-                  <label>City</label>
-                  <input name="city" value={form.city} onChange={handleChange} />
-                </div>
+              <label>
+                City
+                <input name="city" value={form.city} onChange={handleChange} />
+              </label>
 
-                <div className="sc-col">
-                  <label>State / Province</label>
-                  <input
-                    name="state"
-                    value={form.state}
-                    onChange={handleChange}
-                  />
-                </div>
+              <label>
+                State / Province
+                <input name="state" value={form.state} onChange={handleChange} />
+              </label>
 
-                <div className="sc-col">
-                  <label>Postal / Zip Code</label>
-                  <input
-                    name="postal_code"
-                    value={form.postal_code}
-                    onChange={handleChange}
-                  />
-                </div>
+              <label>
+                Postal / Zip Code
+                <input
+                  name="postal_code"
+                  value={form.postal_code}
+                  onChange={handleChange}
+                />
+              </label>
+            </div>
+          </section>
 
-                <div className="sc-col">
-                  <label>Preferred Batch</label>
-                  <select
-                    name="preferred_batch"
-                    value={form.preferred_batch}
-                    onChange={handleChange}
-                  >
-                    <option value="">-- Select --</option>
-                    {BATCH_OPTIONS.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.preferred_batch && (
-                    <div className="sc-err">{errors.preferred_batch}</div>
-                  )}
-                </div>
+          {/* 2) BATCH & SCHEDULE */}
+          <section className="pf-card">
+            <h3>Batch & Schedule</h3>
+            <div className="pf-grid">
+              <label>
+                Day*
+                <select name="day" value={form.day} onChange={handleChange}>
+                  <option value="">-- Select Day --</option>
+                  {DAY_OPTIONS.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+                {errors.day && <div className="field-error">{errors.day}</div>}
+              </label>
 
-                {/* FEE FIELD */}
-                <div className="sc-col">
-                  <label>Fee (₹)</label>
-                  <input
-                    name="fee"
-                    type="number"
-                    min="0"
-                    placeholder="Eg. 1500"
-                    value={form.fee}
-                    onChange={handleChange}
-                  />
-                  {errors.fee && <div className="sc-err">{errors.fee}</div>}
-                </div>
+              <label>
+                Time Slot*
+                <select
+                  name="time_slot"
+                  value={form.time_slot}
+                  onChange={handleChange}
+                >
+                  <option value="">-- Select Time Slot --</option>
+                  {TIME_SLOT_OPTIONS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                {errors.time_slot && (
+                  <div className="field-error">{errors.time_slot}</div>
+                )}
+              </label>
 
-                {/* PAYMENT OPTIONS */}
-                <div className="sc-col sc-payment">
-                  <label>Payment Options</label>
-                  <div className="payment-options-row">
+              <label>
+                Reference By
+                <input
+                  name="reference_by"
+                  value={form.reference_by}
+                  onChange={handleChange}
+                />
+              </label>
+            </div>
+          </section>
+
+          {/* 3) FEE & PAYMENT */}
+          <section className="pf-card">
+            <h3>Fee & Payment</h3>
+            <div className="pf-grid">
+              <label>
+                Fee (₹)*
+                <input
+                  name="fee"
+                  type="number"
+                  min="0"
+                  placeholder="Eg. 1500"
+                  value={form.fee}
+                  onChange={handleChange}
+                />
+                {errors.fee && <div className="field-error">{errors.fee}</div>}
+              </label>
+
+              <label>
+                Payment Options*
+                <div className="pf-methods">
+                  <div className="pf-tags">
                     {PAYMENT_OPTIONS.map((opt) => (
                       <button
                         key={opt.key}
                         type="button"
                         className={
-                          "payment-chip" +
-                          (form.payment_method === opt.key ? " active" : "")
+                          form.payment_method === opt.key ? "tag active" : "tag"
                         }
                         onClick={() => setPayment(opt.key)}
                       >
-                        <span className="chip-checkbox">
-                          {form.payment_method === opt.key ? "✔" : ""}
-                        </span>
-                        <span className="chip-label">{opt.label}</span>
+                        {opt.label}
                       </button>
                     ))}
                   </div>
-                  {errors.payment_method && (
-                    <div className="sc-err">{errors.payment_method}</div>
-                  )}
                 </div>
-
-                <div className="sc-col">
-                  <label>Reference By</label>
-                  <input
-                    name="reference_by"
-                    value={form.reference_by}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div className="sc-col sc-terms">
-                  <label className="sc-terms-label">
-                    <input
-                      type="checkbox"
-                      name="agreed_terms"
-                      checked={form.agreed_terms}
-                      onChange={handleChange}
-                    />
-                    <span>Term &amp; Condition</span>
-                  </label>
-                  {errors.agreed_terms && (
-                    <div className="sc-err">{errors.agreed_terms}</div>
-                  )}
-                </div>
-
-                <div className="sc-col sc-actions">
-                  <div className="sc-action-left" />
-                  <div className="sc-action-right">
-                    <button
-                      type="submit"
-                      className="sc-btn save"
-                      disabled={saving}
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className="sc-btn reset"
-                      onClick={resetForm}
-                      disabled={saving}
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* VIEW mode */}
-        {mode === "view" && (
-          <div className="sc-body full-width">
-            <div className="table-wrap">
-              <div className="table-card">
-                <div className="table-toolbar">
-                  <input
-                    className="search"
-                    placeholder="Search: name, phone, email, batch"
-                    onChange={() => {}}
-                  />
-                  <div className="spacer" />
-                  <button
-                    className="ghost"
-                    onClick={() => fetchList(1)}
-                    disabled={listLoading}
-                  >
-                    {listLoading ? "Refreshing..." : "Refresh"}
-                  </button>
-                </div>
-
-                {listLoading ? (
-                  <div style={{ padding: 24 }}>Loading admissions…</div>
-                ) : items.length === 0 ? (
-                  <div style={{ padding: 24, color: "#6b7280" }}>
-                    No admissions yet.
-                  </div>
-                ) : (
-                  <>
-                    <table className="nice-table">
-                      <thead>
-                        <tr>
-                          <th>Customer</th>
-                          <th>Batch</th>
-                          <th>Date</th>
-                          <th>Fee</th>
-                          <th>Payment</th>
-                          <th>Phone</th>
-                          <th>Email</th>
-                          <th className="right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((r) => (
-                          <tr key={r.id}>
-                            <td
-                              onClick={() => openDetail(r)}
-                              style={{ cursor: "pointer" }}
-                            >
-                              {r.first_name} {r.last_name}
-                            </td>
-                            <td>{r.preferred_batch || "-"}</td>
-                            <td>{r.date || "-"}</td>
-                            <td>{r.fee ? `₹ ${r.fee}` : "-"}</td>
-                            <td>
-                              {r.payment_method
-                                ? r.payment_method === "card"
-                                  ? "Card"
-                                  : r.payment_method === "upi"
-                                  ? "UPI"
-                                  : "NetBanking"
-                                : "-"}
-                            </td>
-                            <td>{r.phone || "-"}</td>
-                            <td>{r.email || "-"}</td>
-                            <td className="right">
-                              <button
-                                className="mini"
-                                onClick={() => handleEdit(r)}
-                              >
-                                ✏️
-                              </button>
-                              <button
-                                className="mini danger"
-                                onClick={() => handleDelete(r.id)}
-                              >
-                                🗑 Delete
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    <div className="table-footer">
-                      <div className="pg-controls">
-                        <button
-                          onClick={() => fetchList(Math.max(1, page - 1))}
-                          disabled={page === 1}
-                        >
-                          ‹ Prev
-                        </button>
-                        <span>
-                          Page {page} / {totalPages}
-                        </span>
-                        <button
-                          onClick={() =>
-                            fetchList(Math.min(totalPages, page + 1))
-                          }
-                          disabled={page === totalPages}
-                        >
-                          Next ›
-                        </button>
-                      </div>
-                      <div className="summary">
-                        <span>{count} records</span>
-                      </div>
-                    </div>
-                  </>
+                {errors.payment_method && (
+                  <div className="field-error">{errors.payment_method}</div>
                 )}
-              </div>
-            </div>
-          </div>
-        )}
+              </label>
 
-        {/* detail drawer */}
-        <div className={`sc-drawer ${drawerOpen ? "open" : ""}`}>
-          <div
-            className="sc-drawer-inner"
-            role="dialog"
-            aria-modal={drawerOpen}
-          >
-            <button className="drawer-close" onClick={closeDetail}>
-              ✕
+              <label className="pf-checkbox-row">
+                <input
+                  type="checkbox"
+                  name="agreed_terms"
+                  checked={form.agreed_terms}
+                  onChange={handleChange}
+                />
+                <span>Term &amp; Condition</span>
+                {errors.agreed_terms && (
+                  <div className="field-error">{errors.agreed_terms}</div>
+                )}
+              </label>
+            </div>
+          </section>
+
+          {/* ACTIONS */}
+          <div className="pf-actions">
+            <button type="submit" className="btn" disabled={saving}>
+              {saving ? "Saving..." : "Save Admission"}
             </button>
-            {selected ? (
-              <>
-                <h3>
-                  {selected.first_name} {selected.last_name}{" "}
-                  <span className="muted small">#{selected.id}</span>
-                </h3>
-                <p>
-                  <strong>Batch:</strong> {selected.preferred_batch || "-"}
-                </p>
-                <p>
-                  <strong>Fee:</strong>{" "}
-                  {selected.fee ? `₹ ${selected.fee}` : "-"}
-                </p>
-                <p>
-                  <strong>Payment:</strong>{" "}
-                  {selected.payment_method
-                    ? selected.payment_method === "card"
-                      ? "Card"
-                      : selected.payment_method === "upi"
-                      ? "UPI"
-                      : "NetBanking"
-                    : "-"}
-                </p>
-                <p>
-                  <strong>Phone:</strong> {selected.phone || "-"}
-                </p>
-                <p>
-                  <strong>Email:</strong> {selected.email || "-"}</p>
-                <p className="muted">{selected.address1}</p>
-              </>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={resetForm}
+              disabled={saving}
+            >
+              Reset
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* VIEW MODE (pf table style) */}
+      {tab === "VIEW" && (
+        <div className="pf-table-card">
+          <div className="pf-table-top">
+            <input
+              className="pf-search"
+              placeholder="Search: name, phone, email, batch"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <button
+              className="btn"
+              onClick={() => fetchList(1)}
+              disabled={listLoading}
+            >
+              {listLoading ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+
+          <div className="pf-table-wrap">
+            {listLoading ? (
+              <div style={{ padding: 24 }}>Loading admissions…</div>
+            ) : filteredItems.length === 0 ? (
+              <div style={{ padding: 24, color: "#6b7280" }}>
+                No admissions yet.
+              </div>
             ) : (
-              <div>No details</div>
+              <table className="pf-table">
+                <thead>
+                  <tr>
+                    <th>Student</th>
+                    <th>Day</th>
+                    <th>Time Slot</th>
+                    <th>Date</th>
+                    <th>Fee</th>
+                    <th>Payment</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th className="c">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((r) => (
+                    <tr key={r.id}>
+                      <td
+                        onClick={() => openDetail(r)}
+                        style={{ cursor: "pointer" }}
+                      >
+                        {r.first_name} {r.last_name}
+                      </td>
+                      <td>{r.day || "-"}</td>
+                      <td>{r.time_slot || "-"}</td>
+                      <td>{r.date || "-"}</td>
+                      <td>{r.fee ? `₹ ${r.fee}` : "-"}</td>
+                      <td>
+                        {r.payment_method
+                          ? r.payment_method === "card"
+                            ? "Card"
+                            : r.payment_method === "upi"
+                            ? "UPI"
+                            : "NetBanking"
+                          : "-"}
+                      </td>
+                      <td>{r.phone || "-"}</td>
+                      <td>{r.email || "-"}</td>
+                      <td className="c">
+                        <button
+                          className="mini"
+                          onClick={() => handleEdit(r)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="mini danger"
+                          onClick={() => handleDelete(r.id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
-          <div className="sc-drawer-backdrop" onClick={closeDetail} />
+
+          <div className="pf-pager">
+            <button
+              className="mini"
+              onClick={() => fetchList(Math.max(1, page - 1))}
+              disabled={page === 1}
+            >
+              Prev
+            </button>
+            <span>
+              Page {page} / {totalPages}
+            </span>
+            <button
+              className="mini"
+              onClick={() => fetchList(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+            >
+              Next
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* Detail drawer (kept, but can be restyled later) */}
+      <div className={`sc-drawer ${drawerOpen ? "open" : ""}`}>
+        <div
+          className="sc-drawer-inner"
+          role="dialog"
+          aria-modal={drawerOpen}
+        >
+          <button className="drawer-close" onClick={closeDetail}>
+            ✕
+          </button>
+          {selected ? (
+            <>
+              <h3>
+                {selected.first_name} {selected.last_name}{" "}
+                <span className="muted small">#{selected.id}</span>
+              </h3>
+              <p>
+                <strong>Day:</strong> {selected.day || "-"}
+              </p>
+              <p>
+                <strong>Time Slot:</strong> {selected.time_slot || "-"}
+              </p>
+              <p>
+                <strong>Fee:</strong>{" "}
+                {selected.fee ? `₹ ${selected.fee}` : "-"}
+              </p>
+              <p>
+                <strong>Payment:</strong>{" "}
+                {selected.payment_method
+                  ? selected.payment_method === "card"
+                    ? "Card"
+                    : selected.payment_method === "upi"
+                    ? "UPI"
+                    : "NetBanking"
+                  : "-"}
+              </p>
+              <p>
+                <strong>Phone:</strong> {selected.phone || "-"}
+              </p>
+              <p>
+                <strong>Email:</strong> {selected.email || "-"}</p>
+              <p className="muted">{selected.address1}</p>
+            </>
+          ) : (
+            <div>No details</div>
+          )}
+        </div>
+        <div className="sc-drawer-backdrop" onClick={closeDetail} />
       </div>
     </div>
   );
