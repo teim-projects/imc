@@ -559,6 +559,14 @@ class EventBooking(models.Model):
     )
 
     number_of_tickets = models.PositiveIntegerField(default=1)
+
+    # ⭐ NEW: store seat ids like ["premium-1-02", "premium-1-03"]
+    seat_numbers = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of seat ids for this booking (e.g. ['vip-1-01','vip-1-02']).",
+    )
+
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     payment_method = models.CharField(

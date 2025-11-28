@@ -17,13 +17,16 @@ import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
 import HeroCarousel from "./components/HeroCarousel";
 
-// User Dashboard
+// User Dashboard (main)
 import UserDashboard from "./userDashboard/UserDashboard";
 
+// Studio user homepage (list + nice UI)
+import StudioHomePage from "./userDashboard/studio/HomePage";
+
 // Real forms
-import UserStudioBookingForm from "./userDashboard/Forms/UserStudioBookingForm";
+import UserStudioRentalForm from "./userDashboard/Forms/UserStudioRentalForm";
 import UserPhotographyBookingForm from "./userDashboard/Forms/UserPhotographyBookingForm";
-import UserEvents from "./userDashboard/Forms/UserEvents"; // ⭐ NEW – events page
+import UserEvents from "./userDashboard/Forms/UserEvents"; // events page
 
 import "./App.css";
 import Img1 from "./assets/banner.jpg";
@@ -97,7 +100,7 @@ function Layout() {
 
       <main className="app-main">
         <Routes>
-          {/* Home */}
+          {/* Home (just hero) */}
           <Route path="/" element={<div />} />
 
           {/* Auth */}
@@ -141,12 +144,22 @@ function Layout() {
 
           {/* ----------------- Services ----------------- */}
 
-          {/* Studio Booking */}
+          {/* Studio Booking – now opens Studio HomePage */}
           <Route
             path="/studio-booking"
             element={
               <PrivateRoute>
-                <UserStudioBookingForm />
+                <StudioHomePage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* (optional) direct form route if you still want it */}
+          <Route
+            path="/studio-booking/form"
+            element={
+              <PrivateRoute>
+                <UserStudioRentalForm />
               </PrivateRoute>
             }
           />
@@ -161,7 +174,7 @@ function Layout() {
             }
           />
 
-          {/* Events & Shows – NEW */}
+          {/* Events & Shows */}
           <Route
             path="/events-booking"
             element={
@@ -171,7 +184,7 @@ function Layout() {
             }
           />
 
-          {/* Placeholder (still TODO) */}
+          {/* Videography placeholder */}
           <Route
             path="/videography-booking"
             element={
@@ -181,6 +194,7 @@ function Layout() {
             }
           />
 
+          {/* Sound placeholder */}
           <Route
             path="/sound-booking"
             element={

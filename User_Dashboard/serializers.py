@@ -1,14 +1,38 @@
 # User_Dashboard/serializers.py
 from rest_framework import serializers
-from api.models import StudioMaster
+from api.models import StudioMaster, StudioImage   # 👈 make sure StudioImage is imported
 from .models import UserStudioBooking
+
+
+# --------- PUBLIC STUDIO SERIALIZERS (for /user/studios/) --------- #
+
+class PublicStudioImageSerializer(serializers.ModelSerializer):
+    """
+    Minimal studio image representation for the user side.
+    Returns an absolute URL in 'url'.
+    """
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StudioImage      # adjust if your model name is different
+        fields = ["id", "url", "caption"]
+
+    def get_url(self, obj):
+        if not getattr(obj, "image", None):
+            return ""
+        request = self.context.get("request")
+        url = obj.image.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class StudioPublicSerializer(serializers.ModelSerializer):
     """
     Read-only minimal view of StudioMaster for the user side.
+    Now includes images + first_image so React can show thumbnails.
     """
     full_location = serializers.ReadOnlyField()
+    images = PublicStudioImageSerializer(many=True, read_only=True)
+    first_image = serializers.SerializerMethodField()
 
     class Meta:
         model = StudioMaster
@@ -20,9 +44,29 @@ class StudioPublicSerializer(serializers.ModelSerializer):
             "capacity",
             "google_map_link",
             "is_active",
+            "images",       # 👈 list of images
+            "first_image",  # 👈 single thumbnail URL
         ]
         read_only_fields = fields
 
+    def get_first_image(self, obj):
+        """
+        Return the first image URL (absolute) for card thumbnail.
+        """
+        # assuming related_name="images" on StudioImage model
+        if not hasattr(obj, "images"):
+            return ""
+
+        img = obj.images.first()
+        if not img or not getattr(img, "image", None):
+            return ""
+
+        request = self.context.get("request")
+        url = img.image.url
+        return request.build_absolute_uri(url) if request else url
+
+
+# --------- USER STUDIO BOOKING SERIALIZER (unchanged except imports) --------- #
 
 class UserStudioBookingSerializer(serializers.ModelSerializer):
     studio_name = serializers.ReadOnlyField(source="studio.name")
@@ -106,9 +150,6 @@ class UserStudioBookingSerializer(serializers.ModelSerializer):
         return instance
 
 
-
-
-
 from rest_framework import serializers
 from api.models import PhotographyBooking   # use same table/model
 
@@ -147,46 +188,67 @@ class UserPhotographyBookingSerializer(serializers.ModelSerializer):
 
 
 # User_Dashboard/serializers.py
-
 from rest_framework import serializers
 from api.models import Event, EventBooking
 
 
-class EventListSerializer(serializers.ModelSerializer):
+# -------------------------------------------------------------------
+# Small event serializer used inside bookings + base for event list
+# -------------------------------------------------------------------
+class MiniEventSerializer(serializers.ModelSerializer):
     """
-    Public event serializer for user side (used on UserEvents.jsx).
-    Maps Event model fields to the names the frontend expects.
+    Common mapping of Event -> fields used in React.
     """
 
-    # frontend expects: name, event_date, event_time, ticket_price
     name = serializers.CharField(source="title")
     event_date = serializers.DateField(source="date")
     event_time = serializers.CharField(source="time_slot")
-    ticket_price = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         fields = [
             "id",
-            "name",           # from title
+            "name",        # from title
             "event_type",
-            "event_date",     # from date
-            "event_time",     # from time_slot
+            "event_date",  # from date
+            "event_time",  # from time_slot
             "location",
-            "description",
+        ]
 
+
+# -------------------------------------------------------------------
+# Public event serializer for /user/events/
+# -------------------------------------------------------------------
+class EventListSerializer(MiniEventSerializer):
+    """
+    Public event serializer for user side (used on UserEvents.jsx).
+    Extends MiniEventSerializer and adds price/seat fields plus:
+      - booked_seats:    all seat ids booked for this event
+      - user_booked_seats: seat ids booked by current user
+    """
+
+    ticket_price = serializers.SerializerMethodField()
+    booked_seats = serializers.SerializerMethodField()
+    user_booked_seats = serializers.SerializerMethodField()
+
+    class Meta(MiniEventSerializer.Meta):
+        model = Event
+        fields = MiniEventSerializer.Meta.fields + [
+            "description",
             # prices
             "ticket_price",   # computed
             "basic_price",
             "premium_price",
             "vip_price",
-
             # seats (overall + per tier)
             "basic_seats",
             "premium_seats",
             "vip_seats",
             "total_seats",
             "available_seats",
+            # seat maps
+            "booked_seats",
+            "user_booked_seats",
         ]
 
     def get_ticket_price(self, obj):
@@ -199,15 +261,62 @@ class EventListSerializer(serializers.ModelSerializer):
             return obj.ticket_price
         return 0
 
+    # ---------- helpers for booked seats ----------
 
+    def _flatten_seat_numbers(self, queryset):
+        """
+        Turn seat_numbers from multiple bookings into a flat list of strings.
+        Works with JSONField(list) or comma-separated string.
+        """
+        seats = []
+        for booking in queryset:
+            sn = getattr(booking, "seat_numbers", None)
+            if not sn:
+                continue
+
+            if isinstance(sn, (list, tuple)):
+                seats.extend([str(s).strip() for s in sn if str(s).strip()])
+            else:
+                parts = str(sn).split(",")
+                seats.extend([p.strip() for p in parts if p.strip()])
+
+        return seats
+
+    def get_booked_seats(self, obj):
+        qs = EventBooking.objects.filter(event=obj)
+        return self._flatten_seat_numbers(qs)
+
+    def get_user_booked_seats(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return []
+        qs = EventBooking.objects.filter(event=obj, user=request.user)
+        return self._flatten_seat_numbers(qs)
+
+
+# -------------------------------------------------------------------
+# User bookings serializer for /user/event-bookings/
+# -------------------------------------------------------------------
 class UserEventBookingSerializer(serializers.ModelSerializer):
     """
     Serializer for user's event bookings (list + create).
 
     Used by: /user/event-bookings/  ViewSet.
+
+    Frontend (MyBookingsModal) expects:
+      - event_detail: MiniEventSerializer(event)
+      - event_name: snapshot of event.title
+      - seat_numbers: list of seat ids (["premium-1-02", ...])
     """
+
     # this is filled automatically from event.title
     event_name = serializers.CharField(read_only=True)
+
+    # nested event info for MyBookingsModal
+    event_detail = MiniEventSerializer(source="event", read_only=True)
+
+    # will store JSON list in DB (recommended: JSONField)
+    seat_numbers = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = EventBooking
@@ -215,20 +324,23 @@ class UserEventBookingSerializer(serializers.ModelSerializer):
             "id",
             "event",
             "event_name",
+            "event_detail",     # nested event data
             "customer_name",
             "contact_number",
             "email",
             "ticket_type",        # basic / premium / vip / general
             "number_of_tickets",
+            "seat_numbers",       # list of seat ids
             "total_amount",
             "payment_method",     # UPI / Card / Cash
-            "status",             # read-only: confirmed / pending / cancelled
+            "status",             # confirmed / pending / cancelled
             "created_at",
         ]
         read_only_fields = [
             "id",
             "user",
             "event_name",
+            "event_detail",
             "status",
             "created_at",
         ]
@@ -312,6 +424,16 @@ class UserEventBookingSerializer(serializers.ModelSerializer):
         # attach user if logged in
         if user and user.is_authenticated:
             validated_data["user"] = user
+
+        # normalise seat_numbers so we always store list[str]
+        sn = validated_data.get("seat_numbers")
+        if sn is None:
+            pass
+        elif isinstance(sn, (list, tuple)):
+            validated_data["seat_numbers"] = [str(s).strip() for s in sn if str(s).strip()]
+        else:
+            parts = str(sn).split(",")
+            validated_data["seat_numbers"] = [p.strip() for p in parts if p.strip()]
 
         # auto-calculate total_amount if not provided or <= 0
         price_per_ticket = self._pick_price(event, ticket_type)

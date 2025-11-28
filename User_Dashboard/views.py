@@ -94,14 +94,11 @@ class UserPhotographyBookingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
-
-
 # User_Dashboard/views.py
+
 from rest_framework import viewsets, permissions, filters
 from api.models import Event, EventBooking
 from .serializers import EventListSerializer, UserEventBookingSerializer
-
-# ... your existing imports and viewsets ...
 
 
 class PublicEventViewSet(viewsets.ReadOnlyModelViewSet):
@@ -110,13 +107,22 @@ class PublicEventViewSet(viewsets.ReadOnlyModelViewSet):
       GET /user/events/        -> list all events (user side)
       GET /user/events/<id>/   -> single event detail
 
-    Uses EventListSerializer (name, event_date, event_time, seats, prices...)
+    Uses EventListSerializer to map internal Event fields
+    (title/date/time_slot/etc.) to the frontend shape:
+      - name
+      - event_date
+      - event_time
+      - location
+      - ticket_price, basic_price, premium_price, vip_price
+      - available_seats
+      - booked_seats
+      - user_booked_seats (if request.user is authenticated)
     """
     queryset = Event.objects.all().order_by("-date", "time_slot", "-created_at")
     serializer_class = EventListSerializer
-    permission_classes = [permissions.AllowAny]  # or IsAuthenticated if you prefer
+    permission_classes = [permissions.AllowAny]
 
-    # optional: search + ordering (useful for future filters/search)
+    # optional: search + ordering (for future filters/search)
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["title", "location", "description", "event_type"]
     ordering_fields = [
@@ -132,6 +138,15 @@ class PublicEventViewSet(viewsets.ReadOnlyModelViewSet):
     ]
     ordering = ["-date", "time_slot"]
 
+    def get_serializer_context(self):
+        """
+        Pass request in context so serializer can compute user_booked_seats
+        based on request.user.
+        """
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx
+
 
 class UserEventBookingViewSet(viewsets.ModelViewSet):
     """
@@ -139,12 +154,54 @@ class UserEventBookingViewSet(viewsets.ModelViewSet):
       GET  /user/event-bookings/        -> list current user's bookings
       POST /user/event-bookings/        -> create booking for an event
       GET  /user/event-bookings/<id>/   -> booking detail
+      PUT/PATCH/DELETE (optional)       -> on user's own bookings
+
+    Frontend:
+      - POST from SeatSelectionModal:
+          {
+            "event": 1,
+            "customer_name": "...",
+            "contact_number": "...",
+            "email": "",
+            "ticket_type": "basic" | "premium" | "vip",
+            "number_of_tickets": 2,
+            "seat_numbers": ["basic-1-01","basic-1-02"],
+            "total_amount": "500.00",
+            "payment_method": "UPI" | "Card" | "Cash"
+          }
+
+      - GET from "My Bookings" modal:
+          returns list of objects like:
+          {
+            "id": ...,
+            "event": 1,
+            "event_detail": {
+                "id": ...,
+                "name": "...",
+                "event_date": "2025-01-01",
+                "event_time": "19:00:00",
+                "location": "...",
+                ...
+            },
+            "customer_name": "...",
+            "contact_number": "...",
+            "ticket_type": "basic",
+            "number_of_tickets": 2,
+            "seat_numbers": ["basic-1-01","basic-1-02"],
+            "total_amount": "500.00",
+            "payment_method": "UPI",
+            "created_at": "2025-01-01T10:30:00Z"
+          }
     """
 
     serializer_class = UserEventBookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        """
+        Only bookings of the logged-in user, newest first.
+        We also join the related event so serializer can expose event_detail.
+        """
         return (
             EventBooking.objects
             .filter(user=self.request.user)
@@ -152,10 +209,18 @@ class UserEventBookingViewSet(viewsets.ModelViewSet):
             .order_by("-created_at")
         )
 
+    def get_serializer_context(self):
+        """
+        Ensure serializer has access to request for any user-specific logic.
+        """
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx
+
     def perform_create(self, serializer):
         """
-        Serializer already uses request.user from context to set 'user'
-        and calculates total_amount, but we call save() here to keep
-        the standard DRF pattern.
+        Attach the authenticated user to the booking.
+        Any extra logic (like seat validation / total_amount calculation)
+        should live in UserEventBookingSerializer.validate()/create().
         """
-        serializer.save()
+        serializer.save(user=self.request.user)
