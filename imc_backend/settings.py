@@ -35,7 +35,8 @@ SECRET_KEY = 'django-insecure-enn@a0!v4mho+wm@l@r9=(_^jy(2n+^7#49a4l!2g+%=p+-zv7
 DEBUG = True
 
 # Add allowed hosts
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['imcpune.in', 'api.imcpune.in', 'localhost', '127.0.0.1']
+
 
 
 # Application definition
@@ -170,7 +171,7 @@ DATABASES = {
         'NAME': 'imc_db',
         'HOST': 'localhost',
         'USER': 'root',
-        'PASSWORD': '',
+        'PASSWORD': 'root',
         'PORT': 3306,
         'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
@@ -214,7 +215,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 

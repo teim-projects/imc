@@ -30,7 +30,7 @@ import UserEvents from "./userDashboard/Forms/UserEvents"; // events page
 
 import "./App.css";
 import Img1 from "./assets/banner.jpg";
-import Img2 from "./assets/banner1.jpg";
+import Img2 from "./assets/banner1.JPG";
 
 /* ----------------- Auth helpers ----------------- */
 const getUserInfo = () => {
