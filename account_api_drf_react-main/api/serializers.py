@@ -834,3 +834,22 @@ class SingerSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(obj.photo.url)
         return obj.photo.url
+    
+
+
+
+
+    # api/serializers.py
+from rest_framework import serializers
+from .models import SingingClass
+
+class SingingClassSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SingingClass
+        fields = [
+            "id", "first_name", "last_name", "phone", "email",
+            "address1", "address2", "city", "state", "postal_code",
+            "preferred_batch", "reference_by", "agreed_terms",
+            "status", "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "status"]

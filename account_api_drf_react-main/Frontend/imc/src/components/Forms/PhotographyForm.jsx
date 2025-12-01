@@ -27,7 +27,7 @@ const initialForm = {
   location: "",
   package_type: "Standard",
   photographers_count: 1,
-  videographers_count: 0,
+  
   drone_needed: false,
   equipment_needed: "",
   notes: "",
@@ -202,7 +202,7 @@ const PhotographyForm = ({ onClose, viewOnly = false }) => {
       location: row.location || "",
       package_type: row.package_type || "Standard",
       photographers_count: row.photographers_count ?? 1,
-      videographers_count: row.videographers_count ?? 0,
+    
       drone_needed: !!row.drone_needed,
       equipment_needed: row.equipment_needed || "",
       notes: row.notes || "",
@@ -312,10 +312,7 @@ const PhotographyForm = ({ onClose, viewOnly = false }) => {
                 Photographers
                 <input type="number" min="0" name="photographers_count" value={form.photographers_count} onChange={onChange} />
               </label>
-              <label>
-                Videographers
-                <input type="number" min="0" name="videographers_count" value={form.videographers_count} onChange={onChange} />
-              </label>
+            
             </div>
           </section>
 

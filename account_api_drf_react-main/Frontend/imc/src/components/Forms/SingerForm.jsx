@@ -365,7 +365,7 @@ export default function SingerFormPage({ initialMode = "list" }) {
               </div>
 
               <div>
-                <label className="form-label">Hourly Rate (₹)</label>
+                <label className="form-label">Yearly Rate (₹)</label>
                 <input className="input" name="rate" type="number" step="0.01" value={form.rate} onChange={handleChange} placeholder="0.00" />
               </div>
 
