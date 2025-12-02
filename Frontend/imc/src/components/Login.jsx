@@ -227,7 +227,7 @@ export default function Login() {
           {/* Google OAuth button */}
           {/* NOTE: after Google login you may also want to call fetchUserAndRedirect inside GoogleAuthButton */}
           <GoogleAuthButton
-            endpoint="/auth/google/"
+            endpoint="/auth/auth/google/"
             onSuccessNavigate="/dashboard"
           />
 
