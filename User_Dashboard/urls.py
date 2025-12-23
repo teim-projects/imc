@@ -8,18 +8,36 @@ from .views import (
     UserPhotographyBookingViewSet,
     PublicEventViewSet,
     UserEventBookingViewSet,
+    SingerViewSet,   # ⬅️ NEW
 )
 
 router = DefaultRouter()
 
-# existing
 router.register(r"studios", PublicStudioViewSet, basename="user-studios")
-router.register(r"studio-bookings", UserStudioBookingViewSet, basename="user-studio-bookings")
-router.register(r"photography-bookings", UserPhotographyBookingViewSet, basename="user-photography-bookings")
+router.register(
+    r"studio-bookings",
+    UserStudioBookingViewSet,
+    basename="user-studio-bookings",
+)
+router.register(
+    r"photography-bookings",
+    UserPhotographyBookingViewSet,
+    basename="photography-bookings"
+)
 
-# ⭐ new
 router.register(r"events", PublicEventViewSet, basename="user-events")
-router.register(r"event-bookings", UserEventBookingViewSet, basename="user-event-bookings")
+router.register(
+    r"event-bookings",
+    UserEventBookingViewSet,
+    basename="user-event-bookings",
+)
+
+# 🚀 THIS NOW RETURNS SINGER LIST, NOT EVENTS
+router.register(
+    r"singer",
+    SingerViewSet,
+    basename="user-singer",
+)
 
 urlpatterns = [
     path("", include(router.urls)),

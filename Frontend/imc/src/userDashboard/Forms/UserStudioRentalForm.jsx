@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import axios from "axios";
 import "../../components/Forms/Forms.css"; // adjust path if needed
 
@@ -82,6 +84,7 @@ const humanizeErr = (err) => {
 =================================================================== */
 
 const UserStudioRentalForm = ({ initialStudio = null, onClose }) => {
+  const navigate = useNavigate();   // ✅ ADD THIS LINE
   const [masters, setMasters] = useState([]);
   const [bookings, setBookings] = useState([]);
 
@@ -324,15 +327,29 @@ const UserStudioRentalForm = ({ initialStudio = null, onClose }) => {
     };
 
     setSaving(true);
-    try {
-      await api.post(BOOKINGS_URL, payload);
-      setSuccessMsg("✅ Booking request submitted!");
-      resetForm();
-    } catch (err) {
-      setError(humanizeErr(err));
-    } finally {
-      setSaving(false);
-    }
+try {
+  // 1️⃣ Save booking first
+  const res = await api.post(BOOKINGS_URL, payload);
+
+  // 2️⃣ Calculate total amount
+  const totalAmount =
+    Number(priceToSend || 0) * Number(formData.duration || 1);
+
+  // 3️⃣ Redirect to payment page
+  navigate("/payment", {
+    state: {
+      booking: res.data,            // booking response
+      studio: selectedStudio,       // studio details
+      amount: totalAmount,          // total payment
+    },
+  });
+
+} catch (err) {
+  setError(humanizeErr(err));
+} finally {
+  setSaving(false);
+}
+
   };
 
   /* --------- UI ---------- */

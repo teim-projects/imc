@@ -346,9 +346,9 @@ class PrivateBooking(models.Model):
 # ============================================================
 # ===================== PHOTOGRAPHY (OLD NAMES) ==============
 # ============================================================
-
 from django.db import models
 from django.conf import settings
+
 
 class PhotographyBooking(models.Model):
     client = models.CharField(max_length=200)
@@ -381,17 +381,21 @@ class PhotographyBooking(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     # Payment
-    payment_methods_list = models.JSONField(default=list)   # ["Cash"]
+    payment_methods_list = models.JSONField(default=list)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="photo_bookings"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="photo_bookings"
     )
 
     def __str__(self):
         return f"{self.client} – {self.event_type}"
+
 
 
 # ============================================================
@@ -783,6 +787,7 @@ SoundSetup = Sound
 
 
 
+
 # ===============================================
 # ============  Singer (SERVICE)  =========
 # ===============================================
@@ -811,6 +816,8 @@ class Singer(models.Model):
         ('other', 'Other'),
     )
 
+    
+
     name = models.CharField(max_length=255)
     genre = models.CharField(max_length=120, blank=True, null=True)
     experience = models.PositiveIntegerField(default=0)
@@ -823,9 +830,8 @@ class Singer(models.Model):
     active = models.BooleanField(default=True)
     photo = models.ImageField(upload_to=singer_photo_upload_to, blank=True, null=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+    created_at = models.DateField()          # ONLY DATE (YYYY-MM-DD)
+    updated_at = models.DateField()      # DATE 
     class Meta:
         ordering = ('-id',)
         verbose_name = "Singer"
@@ -870,9 +876,8 @@ class Singer(models.Model):
     active = models.BooleanField(default=True)
     photo = models.ImageField(upload_to='singers/', null=True, blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
+    created_at = models.DateField()          # ONLY DATE (YYYY-MM-DD)
+    updated_at = models.DateField()      # DATE 
     class Meta:
         ordering = ['-created_at']
         verbose_name_plural = "Singers"
@@ -880,6 +885,7 @@ class Singer(models.Model):
     def __str__(self):
         return self.name
     
+
 
 # ===============================================
 # ============  Singing (SERVICE)  =========

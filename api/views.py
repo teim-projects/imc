@@ -611,17 +611,44 @@ class SoundViewSet(viewsets.ModelViewSet):
 # ====================================================================
 # Singer Master (Service)
 # ====================================================================
-
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from .models import Singer
 from .serializers import SingerSerializer
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+
+class IsAdminOrReadOnlyForUsers(permissions.BasePermission):
+    """
+    Admin → Full access
+    User → Read-only
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return request.user.is_authenticated
+
+        return (
+            request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
+
 
 class SingerViewSet(viewsets.ModelViewSet):
-    queryset = Singer.objects.all()
     serializer_class = SingerSerializer
-    permission_classes = [permissions.IsAuthenticated]  # adjust as needed
+    permission_classes = [IsAdminOrReadOnlyForUsers]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+
+    search_fields = ["name", "city", "genre", "mobile"]
+    ordering_fields = ["created_at", "name", "rate"]
+    ordering = ["-created_at"]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_staff or user.is_superuser:
+            return Singer.objects.all()
+        return Singer.objects.filter(active=True)
 
 
 

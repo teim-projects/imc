@@ -77,22 +77,22 @@ class UserStudioBookingViewSet(viewsets.ModelViewSet):
 
 
 
-
-from rest_framework import viewsets, permissions
-from api.models import PhotographyBooking   # same model/table
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAuthenticated
+from api.models import PhotographyBooking
 from .serializers import UserPhotographyBookingSerializer
 
-class UserPhotographyBookingViewSet(viewsets.ModelViewSet):
+
+class UserPhotographyBookingViewSet(ModelViewSet):
     serializer_class = UserPhotographyBookingSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return PhotographyBooking.objects.filter(
-            user=self.request.user
-        ).order_by("-created_at")
+        return PhotographyBooking.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
 
 # User_Dashboard/views.py
 
@@ -224,3 +224,42 @@ class UserEventBookingViewSet(viewsets.ModelViewSet):
         should live in UserEventBookingSerializer.validate()/create().
         """
         serializer.save(user=self.request.user)
+
+
+
+# ... your existing PublicEventViewSet & UserEventBookingViewSet ...
+# User_Dashboard/views.py
+from rest_framework import viewsets, permissions, filters
+from api.models import Event, EventBooking, Singer
+from .serializers import (
+    EventListSerializer,
+    UserEventBookingSerializer,
+    SingerListSerializer,
+)
+
+# ... PublicEventViewSet + UserEventBookingViewSet above ...
+
+
+class SingerViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    /user/singer/
+      GET /user/singer/       -> list available singers (view-only)
+      GET /user/singer/<id>/  -> single singer detail
+    """
+
+    serializer_class = SingerListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Singer.objects.filter(active=True).order_by("name")
+
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "genre", "city", "area", "state", "profession"]
+    ordering_fields = ["name", "experience", "rate", "city"]
+    ordering = ["name"]
+
+    def get_serializer_context(self):
+        """
+        Ensure request is in context so photo_url builds absolute URL.
+        """
+        ctx = super().get_serializer_context()
+        ctx["request"] = self.request
+        return ctx

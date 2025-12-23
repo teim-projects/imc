@@ -736,37 +736,15 @@ class SoundSerializer(serializers.ModelSerializer):
 
 # api/serializers.py
 # api/serializers.py
+# api/serializers.py
 from rest_framework import serializers
-from .models import Singer   # ← Import the actual model
+from .models import Singer
 
 
 class SingerSerializer(serializers.ModelSerializer):
-    mobile_number = serializers.CharField(source="mobile", required=False, allow_blank=True)
-    is_active = serializers.BooleanField(source="active", required=False)
-    photo_url = serializers.SerializerMethodField()
-
     class Meta:
-        model = Singer   # ← Use the imported model, NOT string!
-        fields = [
-            "id", "name", "birth_date", "mobile", "mobile_number",
-            "profession", "education", "achievement", "favourite_singer",
-            "reference_by", "genre", "experience", "area", "city", "state",
-            "rate", "gender", "active", "is_active", "photo", "photo_url",
-            "created_at", "updated_at"
-        ]
-        read_only_fields = ("id", "created_at", "updated_at", "photo_url")
-        extra_kwargs = {
-            "photo": {"required": False, "allow_null": True},
-        }
-
-    def get_photo_url(self, obj):
-        if not obj.photo:
-            return None
-        request = self.context.get("request")
-        if request:
-            return request.build_absolute_uri(obj.photo.url)
-        return obj.photo.url
-    
+        model = Singer
+        fields = "__all__"
 
 
 # ---------------------------------------------------------------------

@@ -8,44 +8,59 @@ import {
   Navigate,
 } from "react-router-dom";
 
+/* ---------------- COMMON ---------------- */
 import Navbar from "./components/Navbar";
 import Login from "./components/Login";
-import Dashboard from "./components/Dashboard";
 import Register from "./components/Register";
+import Dashboard from "./components/Dashboard";
 import ProfileSection from "./components/ProfileSection";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
 import HeroCarousel from "./components/HeroCarousel";
 
-// User Dashboard (main)
+/* ---------------- USER DASHBOARD ---------------- */
 import UserDashboard from "./userDashboard/UserDashboard";
 
-// Studio user homepage (list + nice UI)
-import StudioHomePage from "./userDashboard/studio/HomePage";
+/* ---------------- PAGES ---------------- */
+import Services from "./userDashboard/pages/Services";
+import Events from "./userDashboard/pages/Events";
+import Contact from "./userDashboard/pages/Contact";
 
-// Real forms
+/* ---------------- SERVICE HOME PAGES ---------------- */
+import StudioHomePage from "./userDashboard/studio/HomePage";
+import EventHomePage from "./userDashboard/Events/HomePage";
+import SingerHomePage from "./userDashboard/singer/HomePage";
+
+/* ---------------- FORMS ---------------- */
+import SingerForm from "./components/Forms/SingerForm";
 import UserStudioRentalForm from "./userDashboard/Forms/UserStudioRentalForm";
 import UserPhotographyBookingForm from "./userDashboard/Forms/UserPhotographyBookingForm";
-import UserEvents from "./userDashboard/Forms/UserEvents"; // events page
+import UserEventBookingForm from "./userDashboard/Forms/UserEvents";
 
+/* ---------------- PAYMENT ---------------- */
+import PaymentPage from "./userDashboard/payment/PaymentPage";
+
+/* ---------------- ASSETS ---------------- */
 import "./App.css";
 import Img1 from "./assets/banner.jpg";
 import Img2 from "./assets/banner1.jpg";
 
-/* ----------------- Auth helpers ----------------- */
+/* ---------------- AUTH HELPERS ---------------- */
 const getUserInfo = () => {
   const token = localStorage.getItem("access");
   const rawUser = localStorage.getItem("user");
   let user = null;
+
   try {
     user = rawUser ? JSON.parse(rawUser) : null;
   } catch {
     user = null;
   }
+
   return { token, user };
 };
 
-/* ----------------- Route guards ----------------- */
+/* ---------------- ROUTE GUARDS ---------------- */
 function PrivateRoute({ children }) {
   const { token } = getUserInfo();
   if (!token) return <Navigate to="/login" replace />;
@@ -60,11 +75,10 @@ function AdminRoute({ children }) {
   const isSuper = !!user?.is_superuser;
 
   if (role === "admin" || isSuper) return children;
-
   return <Navigate to="/user-dashboard" replace />;
 }
 
-/* ----------------- Home Hero ----------------- */
+/* ---------------- HOME HERO ---------------- */
 function HomeHero() {
   const slides = [
     {
@@ -82,13 +96,13 @@ function HomeHero() {
   return (
     <HeroCarousel
       images={slides}
-      interval={2000}
+      interval={2500}
       height="calc(100vh - 70px)"
     />
   );
 }
 
-/* ----------------- Layout ----------------- */
+/* ---------------- LAYOUT ---------------- */
 function Layout() {
   const location = useLocation();
   const showHero = location.pathname === "/";
@@ -100,10 +114,10 @@ function Layout() {
 
       <main className="app-main">
         <Routes>
-          {/* Home (just hero) */}
+          {/* ---------------- HOME ---------------- */}
           <Route path="/" element={<div />} />
 
-          {/* Auth */}
+          {/* ---------------- AUTH ---------------- */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -112,7 +126,7 @@ function Layout() {
             element={<ResetPasswordConfirm />}
           />
 
-          {/* Admin Dashboard */}
+          {/* ---------------- ADMIN ---------------- */}
           <Route
             path="/dashboard"
             element={
@@ -122,7 +136,16 @@ function Layout() {
             }
           />
 
-          {/* User Dashboard */}
+          <Route
+            path="/admin/singers"
+            element={
+              <AdminRoute>
+                <SingerForm initialMode="list" />
+              </AdminRoute>
+            }
+          />
+
+          {/* ---------------- USER ---------------- */}
           <Route
             path="/user-dashboard"
             element={
@@ -132,7 +155,6 @@ function Layout() {
             }
           />
 
-          {/* Profile */}
           <Route
             path="/profile"
             element={
@@ -142,9 +164,12 @@ function Layout() {
             }
           />
 
-          {/* ----------------- Services ----------------- */}
+          {/* ---------------- MAIN PAGES ---------------- */}
+          <Route path="/services" element={<Services />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/contact" element={<Contact />} />
 
-          {/* Studio Booking – now opens Studio HomePage */}
+          {/* ---------------- BOOKINGS ---------------- */}
           <Route
             path="/studio-booking"
             element={
@@ -153,8 +178,6 @@ function Layout() {
               </PrivateRoute>
             }
           />
-
-          {/* (optional) direct form route if you still want it */}
           <Route
             path="/studio-booking/form"
             element={
@@ -164,7 +187,23 @@ function Layout() {
             }
           />
 
-          {/* Photography Booking */}
+          <Route
+            path="/events-booking"
+            element={
+              <PrivateRoute>
+                <EventHomePage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/events-booking/form"
+            element={
+              <PrivateRoute>
+                <UserEventBookingForm />
+              </PrivateRoute>
+            }
+          />
+
           <Route
             path="/photography-booking"
             element={
@@ -174,37 +213,35 @@ function Layout() {
             }
           />
 
-          {/* Events & Shows */}
           <Route
-            path="/events-booking"
+            path="/singer-booking"
             element={
               <PrivateRoute>
-                <UserEvents />
+                <SingerHomePage />
               </PrivateRoute>
             }
           />
 
-          {/* Videography placeholder */}
           <Route
-            path="/videography-booking"
+            path="/singer/register"
             element={
               <PrivateRoute>
-                <div style={{ padding: "2rem" }}>Videography Booking (TODO)</div>
+                <SingerForm initialMode="form" />
               </PrivateRoute>
             }
           />
 
-          {/* Sound placeholder */}
+          {/* ---------------- PAYMENT ---------------- */}
           <Route
-            path="/sound-booking"
+            path="/payment"
             element={
               <PrivateRoute>
-                <div style={{ padding: "2rem" }}>Sound Booking (TODO)</div>
+                <PaymentPage />
               </PrivateRoute>
             }
           />
 
-          {/* fallback */}
+          {/* ---------------- FALLBACK ---------------- */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
@@ -212,7 +249,7 @@ function Layout() {
   );
 }
 
-/* ----------------- App Root ----------------- */
+/* ---------------- APP ROOT ---------------- */
 export default function App() {
   return (
     <Router>

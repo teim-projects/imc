@@ -1,21 +1,19 @@
 // src/userDashboard/studio/HomePage.jsx
 import React, { useState } from "react";
 
-import Hero from "./components/Hero";
-import SearchCard from "./components/SearchCard";
-import About from "./components/About";
-import StudioList from "./components/StudioList";
-import Testimonials from "./components/Testimonials";
-import Footer from "./components/Footer";
 
-// ✅ USER studio rental form
+import StudioList from "./components/StudioList";
+
+
 import UserStudioRentalForm from "../Forms/UserStudioRentalForm";
 
 export default function HomePage() {
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [selectedStudio, setSelectedStudio] = useState(null);
 
-  // called from StudioList → Book Now button
+  // 🔍 search text coming from SearchCard
+  const [searchTerm, setSearchTerm] = useState("");
+
   const openBooking = (studio) => {
     setSelectedStudio(studio || null);
     setShowBookingModal(true);
@@ -25,6 +23,11 @@ export default function HomePage() {
     setShowBookingModal(false);
     setSelectedStudio(null);
   };
+
+  // called when user types / submits search in hero
+  // const handleSearch = (value) => {
+  //   setSearchTerm(value.trim());
+  // };
 
   return (
     <div className="homepage-root">
@@ -50,18 +53,14 @@ export default function HomePage() {
       </div>
 
       <div className="homepage-content">
-        <Hero>
-          <SearchCard />
-        </Hero>
+        
 
         <main className="homepage-main">
-          {/* Pass onBook so StudioList can open rental form */}
-          <StudioList onBook={openBooking} />
+          {/* Studio list filtered by searchTerm */}
+          <StudioList searchTerm={searchTerm} onBook={openBooking} />
         </main>
 
-        <About />
-        <Testimonials />
-        <Footer />
+        
       </div>
 
       {/* ====== USER STUDIO RENTAL MODAL ====== */}
@@ -87,7 +86,6 @@ export default function HomePage() {
               </button>
             </div>
 
-            {/* 🔥 User-facing rental form (only personal details) */}
             <UserStudioRentalForm
               initialStudio={selectedStudio}
               onClose={closeBooking}
@@ -96,7 +94,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* PAGE + MODAL STYLES */}
+      {/* (same CSS as before – unchanged) */}
       <style>{`
         .homepage-root { 
           position:relative; 
@@ -189,10 +187,7 @@ export default function HomePage() {
         .m11{ bottom:45%; right:5%; font-size:64px; opacity:.30; animation-delay:1.8s; }
         .m12{ top:85%; left:45%; font-size:56px; opacity:.25; animation-delay:3.5s; }
 
-        .homepage-content { 
-          position:relative; 
-          z-index:10; 
-        }
+        .homepage-content { position:relative; z-index:10; }
 
         .homepage-main { 
           max-width:1200px; 
@@ -202,7 +197,7 @@ export default function HomePage() {
           width:100%; 
         }
 
-        /* -------- studio list styles -------- */
+        /* --- studio list base styles (same as before) --- */
         .studio-list-section { background: transparent; }
         .studio-list-header { text-align: center; margin-bottom: 24px; }
         .studio-list-header h2 {
