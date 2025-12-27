@@ -25,6 +25,8 @@ import UserDashboard from "./userDashboard/UserDashboard";
 import Services from "./userDashboard/pages/Services";
 import Events from "./userDashboard/pages/Events";
 import Contact from "./userDashboard/pages/Contact";
+import SingingClass from "./userDashboard/pages/SingingClass";
+import SingerRegistration from "./userDashboard/pages/SingerRegistration";
 
 /* ---------------- SERVICE HOME PAGES ---------------- */
 import StudioHomePage from "./userDashboard/studio/HomePage";
@@ -114,10 +116,10 @@ function Layout() {
 
       <main className="app-main">
         <Routes>
-          {/* ---------------- HOME ---------------- */}
+          {/* HOME */}
           <Route path="/" element={<div />} />
 
-          {/* ---------------- AUTH ---------------- */}
+          {/* AUTH */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -126,7 +128,7 @@ function Layout() {
             element={<ResetPasswordConfirm />}
           />
 
-          {/* ---------------- ADMIN ---------------- */}
+          {/* ADMIN */}
           <Route
             path="/dashboard"
             element={
@@ -145,7 +147,7 @@ function Layout() {
             }
           />
 
-          {/* ---------------- USER ---------------- */}
+          {/* USER */}
           <Route
             path="/user-dashboard"
             element={
@@ -164,12 +166,25 @@ function Layout() {
             }
           />
 
-          {/* ---------------- MAIN PAGES ---------------- */}
+          {/* MAIN PAGES */}
           <Route path="/services" element={<Services />} />
           <Route path="/events" element={<Events />} />
           <Route path="/contact" element={<Contact />} />
 
-          {/* ---------------- BOOKINGS ---------------- */}
+          {/* SINGER REGISTRATION PAGE */}
+          <Route path="/singer" element={<SingerRegistration />} />
+
+          {/* SINGING CLASSES - THIS IS WHERE YOUR MANAGEMENT PAGE IS */}
+          <Route
+            path="/singing-classes"
+            element={
+              <PrivateRoute>
+                <SingingClass />
+              </PrivateRoute>
+            }
+          />
+
+          {/* BOOKINGS */}
           <Route
             path="/studio-booking"
             element={
@@ -231,7 +246,7 @@ function Layout() {
             }
           />
 
-          {/* ---------------- PAYMENT ---------------- */}
+          {/* PAYMENT */}
           <Route
             path="/payment"
             element={
@@ -241,10 +256,53 @@ function Layout() {
             }
           />
 
-          {/* ---------------- FALLBACK ---------------- */}
+          {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      {/* GLOBAL STYLES TO ENSURE MODALS WORK */}
+      <style jsx global>{`
+        html, body, #root {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+        }
+
+        .app-main {
+          min-height: calc(100vh - 70px);
+          position: relative;
+          overflow: visible !important;
+        }
+
+        /* Critical fix for modals */
+        .modal-overlay {
+          position: fixed !important;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999 !important;
+          padding: 1rem;
+        }
+
+        .modal {
+          background: white;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 900px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          position: relative;
+          z-index: 10000 !important;
+        }
+      `}</style>
     </>
   );
 }

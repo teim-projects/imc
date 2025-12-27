@@ -263,3 +263,58 @@ class SingerViewSet(viewsets.ReadOnlyModelViewSet):
         ctx = super().get_serializer_context()
         ctx["request"] = self.request
         return ctx
+
+
+
+
+
+
+
+# ====================================================================
+# Singer Master (Service)
+# ====================================================================
+from rest_framework import viewsets, permissions, status
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+
+from api.models import Singer
+from .serializers import (
+    StudioPublicSerializer,
+    UserStudioBookingSerializer,
+)
+
+# -------------------------------
+# PUBLIC SINGER LIST (READ ONLY)
+# -------------------------------
+class SingerPublicViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Singer.objects.all().order_by("-id")
+    serializer_class = StudioPublicSerializer
+    permission_classes = [permissions.AllowAny]
+
+
+# -------------------------------
+# USER BOOKINGS (EXAMPLE)
+# -------------------------------
+class UserStudioBookingViewSet(viewsets.ModelViewSet):
+    serializer_class = UserStudioBookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.serializer_class.Meta.model.objects.filter(
+            user=self.request.user
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+# -------------------------------
+# SIMPLE FUNCTION VIEW (OPTIONAL)
+# -------------------------------
+@api_view(["GET"])
+@permission_classes([permissions.AllowAny])
+def singer_list(request):
+    singers = Singer.objects.all()
+    serializer = StudioPublicSerializer(singers, many=True)
+    return Response(serializer.data)
+

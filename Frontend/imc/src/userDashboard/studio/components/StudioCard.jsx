@@ -1,65 +1,73 @@
-// src/userDashboard/studio/components/StudioCard.jsx
 import React from "react";
+import { Star, MapPin, Zap, Users } from "lucide-react";
 
-export default function StudioCard({ studio, onBook }) {
-  const {
-    name,
-    area,
-    city,
-    state,
-    location,
-    capacity,
-    hourly_rate,
-    first_image,
-    full_location,
-  } = studio;
-
-  const imgUrl =
-    first_image && first_image.trim() !== ""
-      ? first_image
-      : "https://via.placeholder.com/400x250?text=Studio";
-
-  const displayedLocation =
-    full_location ||
-    (area || city || state
-      ? `${area ? area + ", " : ""}${city ? city + ", " : ""}${state || ""}`
-      : location || "Location not set");
-
-  const handleBookClick = () => {
-    if (typeof onBook === "function") {
-      onBook(studio);
-    }
-  };
-
+export default function StudioCard({ studio }) {
   return (
-    <article className="studio-card">
-      <div className="studio-card-img-wrap">
-        <img src={imgUrl} alt={name} className="studio-card-img" />
-        <div className="studio-card-rating">⭐ 4.8</div>
+    <div className="bg-white rounded-[28px] shadow-xl flex flex-col lg:flex-row gap-10 p-6 lg:p-8">
+
+      {/* LEFT IMAGE */}
+      <div className="relative w-full lg:w-[380px] flex-shrink-0">
+        <img
+          src={studio.image}
+          alt={studio.name}
+          className="w-full h-[260px] object-cover rounded-2xl"
+        />
+
+        {/* RATING BADGE */}
+        <div className="absolute top-4 right-4 bg-orange-500 text-white px-4 py-1 rounded-full text-sm font-semibold flex items-center gap-1 shadow-lg">
+          <Star size={14} fill="white" />
+          {studio.rating}
+        </div>
       </div>
 
-      <div className="studio-card-body">
-        <div className="studio-card-main">
-          <h3 className="studio-card-title">{name}</h3>
-          <div className="studio-card-location">📍 {displayedLocation}</div>
-          <div className="studio-card-tags">
-            <span className="tag capacity">
-              {capacity ? `${capacity} people` : "Capacity N/A"}
+      {/* CENTER INFO */}
+      <div className="flex-1 flex flex-col justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {studio.name}
+          </h2>
+
+          <p className="flex items-center gap-2 text-gray-600 mt-3">
+            <MapPin size={16} className="text-red-500" />
+            {studio.location}
+          </p>
+
+          {/* TAGS */}
+          <div className="flex gap-3 mt-6 flex-wrap">
+            <span className="px-4 py-1 rounded-full bg-red-50 text-red-600 text-sm font-semibold flex items-center gap-1">
+              <Users size={14} /> {studio.capacity} people
             </span>
-            <span className="tag instant">⚡ Instant Booking</span>
-          </div>
-        </div>
 
-        <div className="studio-card-footer">
-          <div className="studio-card-price">
-            <span className="price">₹{hourly_rate || "0"}</span>
-            <span className="per">/ hour</span>
+            {studio.instant && (
+              <span className="px-4 py-1 rounded-full bg-blue-50 text-blue-600 text-sm font-semibold flex items-center gap-1">
+                <Zap size={14} /> Instant Booking
+              </span>
+            )}
           </div>
-          <button className="studio-card-btn" type="button" onClick={handleBookClick}>
-            Book Now →
-          </button>
+
+          {/* EXTRA INFO */}
+          <ul className="mt-6 text-gray-600 text-sm space-y-2">
+            <li>🎧 Professional sound-treated rooms</li>
+            <li>🎤 Premium microphones & mixers</li>
+            <li>⚡ Power backup & AC studio</li>
+            <li>🕒 Flexible hourly booking</li>
+          </ul>
         </div>
       </div>
-    </article>
+
+      {/* RIGHT PRICE + CTA */}
+      <div className="flex flex-col justify-between items-end gap-6">
+        <div className="text-right">
+          <div className="text-3xl font-extrabold text-red-600">
+            ₹{studio.price.toLocaleString()}
+          </div>
+          <div className="text-gray-500 text-sm">/ hour</div>
+        </div>
+
+        <button className="px-8 py-3 rounded-full bg-red-500 hover:bg-red-600 text-white font-semibold shadow-lg transition">
+          Book Now →
+        </button>
+      </div>
+    </div>
   );
 }

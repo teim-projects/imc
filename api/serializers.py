@@ -732,11 +732,6 @@ class SoundSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------
 # Singer Master (Service)
 # ---------------------------------------------------------------------
-
-
-# api/serializers.py
-# api/serializers.py
-# api/serializers.py
 from rest_framework import serializers
 from .models import Singer
 
@@ -745,6 +740,24 @@ class SingerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Singer
         fields = "__all__"
+
+    def to_internal_value(self, data):
+        data = data.copy()
+
+        # Remove frontend-only field
+        data.pop("agreed_terms", None)
+
+        # Normalize gender
+        if "gender" in data and isinstance(data["gender"], str):
+            data["gender"] = data["gender"].lower()
+
+        # Convert empty strings to None
+        for field in ["experience", "rate", "birth_date"]:
+            if field in data and data[field] == "":
+                data[field] = None
+
+        return super().to_internal_value(data)
+
 
 
 # ---------------------------------------------------------------------
@@ -796,3 +809,87 @@ class SingingClassSerializer(serializers.ModelSerializer):
                 {"agreed_terms": "You must accept terms & conditions."}
             )
         return attrs
+
+
+
+
+
+
+from rest_framework import serializers
+from .models import Trainer
+
+class TrainerSerializer(serializers.ModelSerializer):
+    batch_schedule = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Trainer
+        fields = "__all__"
+
+    def get_batch_schedule(self, obj):
+        return f"{obj.batch_day} {obj.batch_start_time} - {obj.batch_end_time}"
+
+    def validate(self, data):
+        if data["batch_end_time"] <= data["batch_start_time"]:
+            raise serializers.ValidationError(
+                "Batch end time must be after start time."
+            )
+        return data
+    
+
+
+
+
+
+from rest_framework import serializers
+from .models import Teacher, Class, Batch
+
+
+class TeacherSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Teacher
+        fields = ["id", "name", "phone", "email"]
+
+
+class ClassSerializer(serializers.ModelSerializer):
+    trainer_name = serializers.CharField(source="trainer.name", read_only=True)
+
+    class Meta:
+        model = Class
+        fields = [
+            "id",
+            "name",
+            "description",
+            "fee",
+            "trainer",
+            "trainer_name",
+        ]
+
+
+from rest_framework import serializers
+from .models import Batch
+
+class BatchSerializer(serializers.ModelSerializer):
+    class_name = serializers.CharField(source="class_obj.name", read_only=True)
+    class_fee = serializers.DecimalField(
+        source="class_obj.fee",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+    trainer_name = serializers.CharField(source="trainer.name", read_only=True)
+
+    class Meta:
+        model = Batch
+        fields = [
+            "id",
+            "class_obj",
+            "class_name",
+            "class_fee",
+            "trainer",
+            "trainer_name",
+            "day",
+            "time_slot",
+            "capacity",
+            "created_at",
+        ]
+

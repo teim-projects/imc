@@ -9,15 +9,16 @@ import {
   FaCalendarAlt,
   FaClock,
   FaMapMarkerAlt,
-  FaTicketAlt,
   FaSearch,
   FaChair,
   FaTimes,
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 
-/* ===================== API CONFIG ===================== */
+// Import the new Footer component
+import Footer from "../../components/Footer";
 
+/* ===================== API CONFIG ===================== */
 const BASE =
   import.meta.env.VITE_BASE_API_URL || "http://127.0.0.1:8000";
 
@@ -25,7 +26,6 @@ const EVENTS_URL = `${BASE}/user/events/`;
 const BOOKINGS_URL = `${BASE}/user/event-bookings/`;
 
 /* ===================== AXIOS ===================== */
-
 const api = axios.create();
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access");
@@ -39,7 +39,6 @@ api.interceptors.request.use((config) => {
 });
 
 /* ===================== COLORS ===================== */
-
 const COLORS = {
   cream: "#FFF7DF",
   navy: "#0B2545",
@@ -48,7 +47,6 @@ const COLORS = {
 };
 
 /* ===================== SEAT LAYOUT ===================== */
-
 const SEAT_LAYOUT = {
   vip: { label: "VIP", rows: 2, cols: 8 },
   premium: { label: "Premium", rows: 3, cols: 10 },
@@ -56,10 +54,10 @@ const SEAT_LAYOUT = {
 };
 
 /* ======================================================
-   SEAT SELECTION MODAL
+   SEAT SELECTION MODAL (unchanged)
 ====================================================== */
-
 function SeatSelectionModal({ event, onClose, onBookingCreated }) {
+  // ... (exact same code as before - no changes needed)
   const [tier, setTier] = useState("basic");
   const [seats, setSeats] = useState([]);
   const [name, setName] = useState("");
@@ -133,14 +131,11 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
           let cls =
             "bg-white border text-[#0B2545] hover:border-[#FF7A3C]";
           if (isMine)
-            cls =
-              "bg-[#0B2545] text-[#FFD447] cursor-not-allowed";
+            cls = "bg-[#0B2545] text-[#FFD447] cursor-not-allowed";
           else if (isBooked)
-            cls =
-              "bg-gray-200 text-gray-400 cursor-not-allowed";
+            cls = "bg-gray-200 text-gray-400 cursor-not-allowed";
           else if (isSelected)
-            cls =
-              "bg-gradient-to-r from-[#FFD447] to-[#FF7A3C]";
+            cls = "bg-gradient-to-r from-[#FFD447] to-[#FF7A3C]";
 
           return (
             <button
@@ -170,7 +165,6 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
           animate={{ y: 0 }}
           className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl overflow-hidden"
         >
-          {/* HEADER */}
           <div className="flex justify-between items-center p-6 bg-[#0B2545] text-white">
             <h3 className="text-lg font-bold">{event.name}</h3>
             <button onClick={onClose}>
@@ -178,9 +172,7 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
             </button>
           </div>
 
-          {/* BODY */}
           <div className="grid md:grid-cols-3 gap-6 p-6">
-            {/* SEATS */}
             <div className="md:col-span-2">
               {Object.keys(SEAT_LAYOUT).map((k) => (
                 <div key={k} className="mb-6">
@@ -194,9 +186,7 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
                         setSeats([]);
                       }}
                       className={`text-xs px-3 py-1 rounded-full ${
-                        tier === k
-                          ? "bg-green-500 text-white"
-                          : "border"
+                        tier === k ? "bg-green-500 text-white" : "border"
                       }`}
                     >
                       {tier === k ? "Selected" : "Select"}
@@ -207,10 +197,8 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
               ))}
             </div>
 
-            {/* SUMMARY */}
             <div className="bg-[#0B2545] text-white rounded-2xl p-5">
               <h4 className="font-semibold mb-4">Booking Summary</h4>
-
               <input
                 placeholder="Your Name"
                 value={name}
@@ -223,7 +211,6 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full mb-3 p-2 rounded-xl text-black"
               />
-
               <select
                 value={payment}
                 onChange={(e) => setPayment(e.target.value)}
@@ -233,17 +220,10 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
                 <option>Card</option>
                 <option>Cash</option>
               </select>
-
               <div className="text-lg font-bold text-[#FFD447] mb-4">
                 Total ₹{total}
               </div>
-
-              {error && (
-                <div className="text-xs text-red-300 mb-2">
-                  {error}
-                </div>
-              )}
-
+              {error && <div className="text-xs text-red-300 mb-2">{error}</div>}
               <button
                 onClick={submitBooking}
                 disabled={loading}
@@ -262,7 +242,6 @@ function SeatSelectionModal({ event, onClose, onBookingCreated }) {
 /* ======================================================
    MAIN USER EVENTS PAGE
 ====================================================== */
-
 export default function UserEvents() {
   const [events, setEvents] = useState([]);
   const [search, setSearch] = useState("");
@@ -287,76 +266,108 @@ export default function UserEvents() {
   );
 
   return (
-    <div
-      className="min-h-screen px-4 py-10"
-      style={{ backgroundColor: COLORS.cream }}
-    >
-      <div className="max-w-6xl mx-auto">
-        {/* HEADER */}
-        <h1
-          className="text-4xl font-extrabold mb-6"
-          style={{ color: COLORS.navy }}
+    <div className="min-h-screen flex flex-col">
+      {/* Hero Section (Reduced Height) */}
+      <section
+        className="relative bg-cover bg-center py-24 md:py-32 text-center text-white"
+        style={{
+          backgroundImage: `linear-gradient(rgba(11, 37, 69, 0.75), rgba(11, 37, 69, 0.85)), url('https://images.stockcake.com/public/4/f/4/4f4296af-a359-4bcd-83ba-5b3614b9da12_large/vibrant-concert-crowd-stockcake.jpg')`,
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1 }}
+          className="container mx-auto px-6 relative z-10"
         >
-          🎟️ Events & Shows
-        </h1>
+          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black mb-4 leading-tight">
+            Live Events & Shows
+            <br />
+            <span className="text-[#FFD447] drop-shadow-lg">At IMC Music Club</span>
+          </h1>
+          <p className="text-lg md:text-xl max-w-2xl mx-auto mb-10 opacity-90">
+            Experience unforgettable nights of music, energy, and entertainment. Book your seats now!
+          </p>
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="bg-gradient-to-r from-[#FFD447] to-[#FF7A3C] text-[#0B2545] font-black text-lg py-4 px-10 rounded-full shadow-2xl"
+          >
+            Explore Events →
+          </motion.button>
+        </motion.div>
+      </section>
 
-        {/* SEARCH */}
-        <div className="relative mb-6 max-w-md">
-          <FaSearch className="absolute left-3 top-3 text-gray-400" />
-          <input
-            placeholder="Search events..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 py-2 rounded-full border"
-          />
-        </div>
+      {/* Main Content */}
+      <div className="flex-1 px-4 py-10" style={{ backgroundColor: COLORS.cream }}>
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-4xl font-extrabold mb-6" style={{ color: COLORS.navy }}>
+            🎟️ Events & Shows
+          </h1>
 
-        {/* EVENTS GRID */}
-        {loading ? (
-          <p>Loading events...</p>
-        ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map((e) => (
-              <div
-                key={e.id}
-                className="bg-white rounded-3xl shadow-md overflow-hidden"
-              >
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg">{e.name}</h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {e.location}
-                  </p>
-
-                  <div className="mt-3 text-sm space-y-1">
-                    <div className="flex gap-2">
-                      <FaCalendarAlt /> {e.event_date}
-                    </div>
-                    <div className="flex gap-2">
-                      <FaClock /> {e.event_time}
-                    </div>
-                    <div className="flex gap-2">
-                      <FaChair /> {e.available_seats} seats
-                    </div>
-                  </div>
-
-                  <div className="mt-4 flex justify-between items-center">
-                    <span className="font-bold text-orange-600">
-                      ₹{e.ticket_price}
-                    </span>
-                    <button
-                      onClick={() => setActiveEvent(e)}
-                      className="bg-gradient-to-r from-[#FFD447] to-[#FF7A3C] px-4 py-2 rounded-full font-semibold text-[#0B2545]"
-                    >
-                      Book
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="relative mb-6 max-w-md">
+            <FaSearch className="absolute left-3 top-3 text-gray-400" />
+            <input
+              placeholder="Search events..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 py-2 rounded-full border shadow-sm focus:outline-none focus:ring-2 focus:ring-[#FFD447]"
+            />
           </div>
-        )}
+
+          {loading ? (
+            <p className="text-center py-20 text-[#0B2545] text-xl">Loading events...</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-center py-20 text-[#0B2545] text-xl">No events found.</p>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {filtered.map((e) => (
+                <motion.div
+                  key={e.id}
+                  whileHover={{ y: -10 }}
+                  className="bg-white rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition duration-300"
+                >
+                  <div className="p-6">
+                    <h3 className="font-bold text-xl text-[#0B2545] mb-2">{e.name}</h3>
+                    <p className="text-sm text-gray-600 flex items-center gap-2 mb-4">
+                      <FaMapMarkerAlt className="text-[#FF7A3C]" /> {e.location}
+                    </p>
+
+                    <div className="space-y-3 text-[#0B2545]">
+                      <div className="flex gap-3 items-center">
+                        <FaCalendarAlt className="text-[#FF7A3C]" /> {e.event_date}
+                      </div>
+                      <div className="flex gap-3 items-center">
+                        <FaClock className="text-[#FF7A3C]" /> {e.event_time}
+                      </div>
+                      <div className="flex gap-3 items-center">
+                        <FaChair className="text-[#FF7A3C]" /> {e.available_seats} seats available
+                      </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-between items-center">
+                      <span className="font-black text-3xl text-[#FF7A3C]">
+                        ₹{e.ticket_price}
+                      </span>
+                      <button
+                        onClick={() => setActiveEvent(e)}
+                        className="bg-gradient-to-r from-[#FFD447] to-[#FF7A3C] px-6 py-3 rounded-full font-bold text-[#0B2545] shadow-lg hover:shadow-xl transition"
+                      >
+                        Book Now
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Reusable Footer Component */}
+      <Footer />
+
+      {/* Booking Modal */}
       {activeEvent && (
         <SeatSelectionModal
           event={activeEvent}

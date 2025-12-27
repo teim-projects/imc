@@ -488,3 +488,20 @@ class SingerListSerializer(serializers.ModelSerializer):
         if request is not None:
             return request.build_absolute_uri(url)
         return url
+
+
+
+
+
+# ---------------------------------------------------------------------
+# Singer Master (Service)
+# ---------------------------------------------------------------------
+from rest_framework import serializers
+from api.models import Singer
+
+
+class UserSingerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Singer
+        fields = "__all__"
+

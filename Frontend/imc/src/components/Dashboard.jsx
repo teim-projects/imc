@@ -14,7 +14,7 @@ import PhotographyForm from "./Forms/PhotographyForm";
 import VideographyForm from "./Forms/VideographyForm";
 import SoundSystemService from "./Forms/SoundSystemService";
 import SingerForm from "./Forms/SingerForm";
-import PaymentForm from "./Forms/PaymentForm";
+import TrainerForm from "./Forms/TrainerForm";
 import UserForm from "./Forms/UserForm";
 import PrivateBookingForm from "./Forms/PrivateBookingForm";
 
@@ -55,7 +55,8 @@ const ALLOWED_KEYS = new Set([
   "addVideography", "viewVideography",
   "addSound", "viewSound",
   "addSinger", "viewSinger",
-  "addPayment", "viewPayment",
+  "addTrainer",
+  "viewTrainer",
   "addUser", "viewUser",
   "addStudioMaster", "viewStudioMaster",
 ]);
@@ -76,7 +77,8 @@ const prettyTitle = (k) => {
     addVideography: " Videography Service ", viewVideography: "View Videography Bookings",
     addSound: "Add Sound System Service", viewSound: "View Sound Jobs",
     addSinger: "Add Singer", viewSinger: "View Singers",
-    addPayment: "Add Payment", viewPayment: "View Payments",
+    addTrainer: "Add Trainer",
+    viewTrainer: "View Trainers",
     addUser: "Add User", viewUser: "View Users",
     addStudioMaster: "Add Studio (Master)", viewStudioMaster: "View Studios (Master)",
     // Singing classes labels
@@ -212,8 +214,10 @@ export default function Dashboard() {
       case "addSinger":       return <SingerForm onClose={closeForm} viewOnly={false} />;
       case "viewSinger":      return <SingerForm onClose={closeForm} viewOnly />;
 
-      case "addPayment":      return <PaymentForm onClose={closeForm} viewOnly={false} />;
-      case "viewPayment":     return <PaymentForm onClose={closeForm} viewOnly />;
+      case "trainer":
+      case "addTrainer":
+      case "viewTrainer":
+        return <TrainerForm viewOnly={activeForm === "viewTrainer"} />;
 
       case "addUser":         return <UserForm onClose={closeForm} viewOnly={false} />;
       case "viewUser":        return <UserForm onClose={closeForm} viewOnly />;

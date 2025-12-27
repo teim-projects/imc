@@ -1,767 +1,436 @@
-// src/components/Forms/SingerFormPage.jsx
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-// import "./Forms.css";
+import React, { useState } from 'react';
+import { useMutation } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  Music2, Users, Clock, Calendar, Star, Check, 
+  Loader2, CheckCircle, Sun, Moon, Sunset
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 
-const BASE = import.meta?.env?.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const API_URL = `${BASE.replace(/\/$/, "")}/auth/singers/`;
+const batches = [
+  { id: 'morning', label: 'Morning Batch', time: '7:00 AM - 9:00 AM', icon: Sun, days: 'Mon, Wed, Fri' },
+  { id: 'afternoon', label: 'Afternoon Batch', time: '2:00 PM - 4:00 PM', icon: Sunset, days: 'Mon, Wed, Fri' },
+  { id: 'evening', label: 'Evening Batch', time: '6:00 PM - 8:00 PM', icon: Moon, days: 'Mon, Wed, Fri' },
+  { id: 'weekend', label: 'Weekend Batch', time: '10:00 AM - 1:00 PM', icon: Calendar, days: 'Sat, Sun' },
+];
 
-// -------------------- AXIOS INSTANCE --------------------
-const api = axios.create({ baseURL: API_URL });
-
-api.interceptors.request.use((cfg) => {
-  const token = localStorage.getItem("access");
-  if (token)
-    cfg.headers = { ...(cfg.headers || {}), Authorization: `Bearer ${token}` };
-  return cfg;
-});
-api.interceptors.response.use(
-  (r) => r,
-  (err) => {
-    if (err?.response?.status === 401) {
-      alert("Session expired or not authenticated. Redirecting to login.");
-      window.location.href = "/login";
-    }
-    return Promise.reject(err);
+const plans = [
+  {
+    name: 'Beginner',
+    duration: '3 Months',
+    price: 5000,
+    features: ['Basic vocal training', 'Breathing techniques', 'Rhythm & pitch', 'Group sessions'],
+    popular: false
+  },
+  {
+    name: 'Intermediate',
+    duration: '6 Months',
+    price: 9000,
+    features: ['Advanced techniques', 'Song interpretation', 'Stage presence', 'Recording sessions', 'Performance opportunities'],
+    popular: true
+  },
+  {
+    name: 'Professional',
+    duration: '12 Months',
+    price: 16000,
+    features: ['Master-level training', 'Personal mentoring', 'Album recording', 'Live performances', 'Industry connections', 'Certificate'],
+    popular: false
   }
-);
+];
 
-// helpers
-const fmtCurrency = (x) => {
-  if (x === null || x === undefined || x === "") return "0.00";
-  const n = Number(x);
-  if (Number.isNaN(n)) return x;
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+const instructors = [
+  {
+    name: 'Rajesh Kumar',
+    specialty: 'Classical & Bollywood',
+    experience: '15 years',
+    image: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200'
+  },
+  {
+    name: 'Priya Sharma',
+    specialty: 'Western & Pop',
+    experience: '10 years',
+    image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200'
+  },
+  {
+    name: 'Amit Verma',
+    specialty: 'Rock & Metal',
+    experience: '12 years',
+    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200'
+  }
+];
+
+export default function SingingClasses() {
+  const [showForm, setShowForm] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [formData, setFormData] = useState({
+    first_name: '',
+    last_name: '',
+    phone: '',
+    email: '',
+    street_address: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    preferred_batch: '',
+    reference_by: ''
   });
-};
-const safeImageUrl = (url) => {
-  if (!url) return null;
-  try {
-    return new URL(url).href;
-  } catch {
-    return BASE.replace(/\/$/, "") + (url.startsWith("/") ? url : `/${url}`);
-  }
-};
+  const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
 
-export default function SingerFormPage({ initialMode = "list" }) {
-  const emptyInitial = {
-    name: "",
-    birth_date: "",
-    mobile: "",
-    profession: "",
-    education: "",
-    achievement: "",
-    favourite_singer: "",
-    reference_by: "",
-    genre: "",
-    experience: "",
-    area: "",
-    city: "",
-    state: "",
-    rate: "",
-    gender: "",
-    payment_method: "Cash",
-    active: true,
-    photo: null,
-  };
+  const enrollMutation = useMutation({
+    mutationFn: (data) => base44.entities.SingingClass.create(data),
+    onSuccess: () => {
+      setEnrollmentSuccess(true);
+      toast.success("Enrollment successful!");
+    },
+    onError: () => {
+      toast.error("Enrollment failed. Please try again.");
+    }
+  });
 
-  const [form, setForm] = useState(emptyInitial);
-  const [preview, setPreview] = useState(null);
-  const [mode, setMode] = useState(initialMode === "form" ? "form" : "list"); // 'form' | 'list'
-  const [editingId, setEditingId] = useState(null);
-
-  const [singers, setSingers] = useState([]);
-  const [loadingList, setLoadingList] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
-  const [searchText, setSearchText] = useState("");
-
-  const accessToken = localStorage.getItem("access");
-
-  useEffect(() => {
-    if (!accessToken) {
-      setError("You are not logged in. Please login to manage singers.");
-      setMode("list");
+  const handleEnroll = () => {
+    if (!formData.first_name || !formData.phone || !formData.preferred_batch) {
+      toast.error("Please fill in all required fields");
       return;
     }
-    fetchSingers();
-    return () => {
-      if (preview) URL.revokeObjectURL(preview);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken]);
 
-  const fetchSingers = async (query) => {
-    setLoadingList(true);
-    setError(null);
-    try {
-      const params = {};
-      if (query || searchText) params.search = query ?? searchText;
-      const res = await api.get("", { params });
-      setSingers(Array.isArray(res.data) ? res.data : res.data.results || []);
-      setMode("list");
-    } catch (err) {
-      console.error("fetchSingers:", err);
-      setError(
-        err?.response?.status === 401
-          ? "Unauthorized. Please login."
-          : "Failed to load singers."
-      );
-    } finally {
-      setLoadingList(false);
-    }
-  };
-
-  const loadSinger = async (id) => {
-    setError(null);
-    try {
-      const res = await api.get(`${id}/`);
-      const d = res.data;
-      setForm({
-        name: d.name || "",
-        birth_date: d.birth_date || "",
-        mobile: d.mobile || "",
-        profession: d.profession || "",
-        education: d.education || "",
-        achievement: d.achievement || "",
-        favourite_singer: d.favourite_singer || "",
-        reference_by: d.reference_by || "",
-        genre: d.genre || "",
-        experience: d.experience ?? "",
-        area: d.area || "",
-        city: d.city || "",
-        state: d.state || "",
-        rate: d.rate ?? "",
-        gender: d.gender || "",
-        payment_method: d.payment_method || "Cash",
-        active: typeof d.active === "boolean" ? d.active : true,
-        photo: d.photo || null,
-      });
-      setPreview(d.photo ? safeImageUrl(d.photo) : null);
-      setEditingId(id);
-      setMode("form");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err) {
-      console.error("loadSinger:", err);
-      setError("Failed to load singer.");
-    }
-  };
-
-  const startAdd = () => {
-    setForm(emptyInitial);
-    if (preview) {
-      URL.revokeObjectURL(preview);
-      setPreview(null);
-    }
-    setEditingId(null);
-    setMode("form");
-    setError(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (type === "checkbox") setForm((f) => ({ ...f, [name]: checked }));
-    else setForm((f) => ({ ...f, [name]: value }));
-  };
-
-  const handleFile = (e) => {
-    const file = e.target.files?.[0] || null;
-    setForm((f) => ({ ...f, photo: file }));
-    if (file) {
-      if (preview) URL.revokeObjectURL(preview);
-      setPreview(URL.createObjectURL(file));
-    }
-  };
-
-  const buildFormData = () => {
-    const fd = new FormData();
-    Object.keys(form).forEach((k) => {
-      if (k === "photo") return;
-      const val = form[k];
-      fd.append(k, val === null || val === undefined ? "" : String(val));
+    enrollMutation.mutate({
+      ...formData,
+      fee_paid: selectedPlan?.price || 0,
+      status: 'pending'
     });
-    if (form.photo instanceof File) fd.append("photo", form.photo);
-    return fd;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!accessToken) {
-      setError("You must be logged in to create or update singers.");
-      return;
-    }
-    if (!form.name.trim()) {
-      setError("Singer name is required.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      if (editingId) {
-        if (form.photo instanceof File) {
-          await api.put(`${editingId}/`, buildFormData(), {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        } else {
-          const payload = { ...form };
-          if (typeof payload.photo === "string" || payload.photo === null)
-            delete payload.photo;
-          await api.put(`${editingId}/`, payload);
-        }
-        alert("Singer updated.");
-      } else {
-        if (form.photo instanceof File) {
-          await api.post("", buildFormData(), {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        } else {
-          await api.post("", form);
-        }
-        alert("Singer created.");
-      }
-      await fetchSingers();
-      setForm(emptyInitial);
-      if (preview) {
-        URL.revokeObjectURL(preview);
-        setPreview(null);
-      }
-      setEditingId(null);
-      setMode("list");
-    } catch (err) {
-      console.error("handleSubmit:", err);
-      if (err?.response) {
-        const { status, data } = err.response;
-        if (status === 401) setError("Unauthorized — please login.");
-        else if (data)
-          setError(typeof data === "string" ? data : JSON.stringify(data));
-        else setError("Save failed. See console for details.");
-      } else {
-        setError("Save failed. See console for details.");
-      }
-    } finally {
-      setSaving(false);
-    }
+  const resetForm = () => {
+    setShowForm(false);
+    setSelectedPlan(null);
+    setFormData({
+      first_name: '',
+      last_name: '',
+      phone: '',
+      email: '',
+      street_address: '',
+      city: '',
+      state: '',
+      postal_code: '',
+      preferred_batch: '',
+      reference_by: ''
+    });
+    setEnrollmentSuccess(false);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("Delete this singer?")) return;
-    try {
-      await api.delete(`${id}/`);
-      await fetchSingers();
-    } catch (err) {
-      console.error("handleDelete:", err);
-      if (err?.response?.status === 401)
-        setError("Unauthorized — please login.");
-      else alert("Delete failed.");
-    }
-  };
-
-  // ------------- NOT LOGGED IN -------------
-  if (!accessToken) {
+  if (enrollmentSuccess) {
     return (
-      <div className="pf-wrap">
-        <div className="pf-card">
-          <h2>Singer Master — Sign in required</h2>
-          <p className="pf-subtitle">
-            You must be logged in to create, update or delete singers.
-          </p>
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <button
-              className="btn"
-              onClick={() => (window.location.href = "/login")}
-            >
-              Go to Login
-            </button>
-            <button className="btn ghost" onClick={() => fetchSingers()}>
-              Try to refresh
-            </button>
-          </div>
-          {error && (
-            <div className="pf-banner pf-error" style={{ marginTop: 12 }}>
-              {error}
-            </div>
-          )}
+      <div className="min-h-screen bg-gray-50 pt-28 pb-20">
+        <div className="max-w-xl mx-auto px-6">
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+            <Card className="p-12 text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-10 h-10 text-green-600" />
+              </div>
+              <h2 className="text-3xl font-bold mb-4">Enrollment Successful!</h2>
+              <p className="text-gray-600 mb-2">Welcome to IMC Singing Classes!</p>
+              <p className="text-gray-500 text-sm mb-8">
+                Our team will contact you shortly with class details and payment information.
+              </p>
+              <Button onClick={resetForm} className="rounded-full bg-gradient-to-r from-amber-500 to-orange-600">
+                Back to Classes
+              </Button>
+            </Card>
+          </motion.div>
         </div>
       </div>
     );
   }
 
-  // ------------- MAIN UI -------------
   return (
-    <div className="pf-wrap">
-      {/* HEADER */}
-      <div className="pf-header">
-        <div>
-          <h2>Singer Master</h2>
-          <p className="pf-subtitle">
-            Manage registered singers, membership fee, and performance details.
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Hero */}
+      <section className="relative py-24 bg-gradient-to-br from-rose-900 via-pink-800 to-purple-900 overflow-hidden">
+        <div className="absolute inset-0 opacity-30">
+          <img
+            src="https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=1920"
+            alt="Singing"
+            className="w-full h-full object-cover"
+          />
         </div>
-        <div className="pf-tabs">
-          <button
-            className={mode === "form" ? "active" : ""}
-            type="button"
-            onClick={startAdd}
-          >
-            Add Singer
-          </button>
-          <button
-            className={mode === "list" ? "active" : ""}
-            type="button"
-            onClick={() => fetchSingers()}
-          >
-            View Singers
-          </button>
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 text-center">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+            <span className="inline-block px-4 py-2 rounded-full bg-white/20 text-white text-sm font-medium mb-6">
+              Learn from the Best
+            </span>
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-6">Singing Classes</h1>
+            <p className="text-xl text-white/80 max-w-2xl mx-auto">
+              Discover your voice with professional vocal training from industry experts
+            </p>
+          </motion.div>
         </div>
-      </div>
+      </section>
 
-      {error && (
-        <div className="pf-banner pf-error" style={{ marginBottom: 12 }}>
-          {typeof error === "string" ? error : JSON.stringify(error)}
-        </div>
-      )}
-
-      {/* FORM MODE */}
-      {mode === "form" && (
-        <form
-          className="pf-form"
-          onSubmit={handleSubmit}
-          encType="multipart/form-data"
-        >
-          {/* PROFILE & CONTACT */}
-          <section className="pf-card">
-            <h3>Profile & Contact</h3>
-            <div className="pf-grid">
-              <label>
-                Singer Name*
-                <input
-                  className="input"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  placeholder="e.g., Arijit Singh"
-                  required
-                />
-              </label>
-
-              <label>
-                Birth Date
-                <input
-                  className="input"
-                  name="birth_date"
-                  type="date"
-                  value={form.birth_date}
-                  onChange={handleChange}
-                />
-              </label>
-
-              <label>
-                Mobile Number
-                <input
-                  className="input"
-                  name="mobile"
-                  value={form.mobile}
-                  onChange={handleChange}
-                  placeholder="+919876543210"
-                />
-              </label>
-
-              <label>
-                Gender
-                <select
-                  className="input"
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleChange}
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </label>
-
-              <label>
-                Profession
-                <input
-                  className="input"
-                  name="profession"
-                  value={form.profession}
-                  onChange={handleChange}
-                  placeholder="e.g., Playback Singer"
-                />
-              </label>
-
-              <label>
-                Education in Music
-                <input
-                  className="input"
-                  name="education"
-                  value={form.education}
-                  onChange={handleChange}
-                  placeholder="e.g., Trinity Grade 8"
-                />
-              </label>
-            </div>
-          </section>
-
-          {/* MUSIC DETAILS */}
-          <section className="pf-card">
-            <h3>Music Details</h3>
-            <div className="pf-grid">
-              <label>
-                Special Achievement
-                <input
-                  className="input"
-                  name="achievement"
-                  value={form.achievement}
-                  onChange={handleChange}
-                  placeholder="e.g., National award"
-                />
-              </label>
-
-              <label>
-                Favourite Singer
-                <input
-                  className="input"
-                  name="favourite_singer"
-                  value={form.favourite_singer}
-                  onChange={handleChange}
-                  placeholder="e.g., Lata Mangeshkar"
-                />
-              </label>
-
-              <label>
-                Genre
-                <input
-                  className="input"
-                  name="genre"
-                  value={form.genre}
-                  onChange={handleChange}
-                  placeholder="e.g., Pop"
-                />
-              </label>
-
-              <label>
-                Experience (years)
-                <input
-                  className="input"
-                  name="experience"
-                  type="number"
-                  value={form.experience}
-                  onChange={handleChange}
-                  placeholder="5"
-                />
-              </label>
-
-              <label>
-                Reference By
-                <input
-                  className="input"
-                  name="reference_by"
-                  value={form.reference_by}
-                  onChange={handleChange}
-                  placeholder="Referrer name"
-                />
-              </label>
-            </div>
-          </section>
-
-          {/* ADDRESS & MEMBERSHIP */}
-          <section className="pf-card">
-            <h3>Address & Membership</h3>
-            <div className="pf-grid">
-              <label>
-                City
-                <input
-                  className="input"
-                  name="city"
-                  value={form.city}
-                  onChange={handleChange}
-                  placeholder="Mumbai"
-                />
-              </label>
-
-              <label>
-                State
-                <input
-                  className="input"
-                  name="state"
-                  value={form.state}
-                  onChange={handleChange}
-                  placeholder="Maharashtra"
-                />
-              </label>
-
-              <label>
-                Area / Locality
-                <input
-                  className="input"
-                  name="area"
-                  value={form.area}
-                  onChange={handleChange}
-                  placeholder="Area / Locality"
-                />
-              </label>
-
-              <label>
-                Annual Membership Fee (₹)
-                <input
-                  className="input"
-                  name="rate"
-                  type="number"
-                  step="0.01"
-                  value={form.rate}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                />
-              </label>
-
-              <label>
-                Payment Method
-                <div className="pf-methods">
-                  <div className="pf-tags">
-                    {["Cash", "Card", "UPI"].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        className={
-                          form.payment_method === opt ? "tag active" : "tag"
-                        }
-                        onClick={() =>
-                          setForm((f) => ({ ...f, payment_method: opt }))
-                        }
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
+      {!showForm ? (
+        <>
+          {/* Batches */}
+          <section className="py-16">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                <h2 className="text-3xl font-bold text-center mb-12">Available Batches</h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {batches.map((batch) => (
+                    <Card key={batch.id} className="p-6 text-center hover:shadow-lg transition-shadow">
+                      <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <batch.icon className="w-8 h-8 text-amber-600" />
+                      </div>
+                      <h3 className="font-bold text-lg mb-2">{batch.label}</h3>
+                      <p className="text-amber-600 font-semibold mb-1">{batch.time}</p>
+                      <p className="text-gray-500 text-sm">{batch.days}</p>
+                    </Card>
+                  ))}
                 </div>
-              </label>
+              </motion.div>
+            </div>
+          </section>
 
-              <label>
-                Status
-                <div style={{ marginTop: 8 }}>
-                  <label
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      name="active"
-                      checked={form.active}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, active: e.target.checked }))
-                      }
-                    />
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        color: form.active ? "#0d7a42" : "#6b7280",
-                      }}
+          {/* Pricing Plans */}
+          <section className="py-16 bg-white">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                <h2 className="text-3xl font-bold text-center mb-4">Choose Your Plan</h2>
+                <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
+                  Select a plan that fits your goals and schedule
+                </p>
+                <div className="grid md:grid-cols-3 gap-8">
+                  {plans.map((plan, idx) => (
+                    <Card 
+                      key={idx} 
+                      className={`p-8 relative overflow-hidden ${plan.popular ? 'ring-2 ring-amber-500 shadow-xl' : ''}`}
                     >
-                      {form.active ? "Active" : "Inactive"}
-                    </span>
-                  </label>
+                      {plan.popular && (
+                        <Badge className="absolute top-4 right-4 bg-amber-500">Most Popular</Badge>
+                      )}
+                      <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+                      <p className="text-gray-500 mb-4">{plan.duration}</p>
+                      <div className="mb-6">
+                        <span className="text-4xl font-bold text-amber-600">₹{plan.price.toLocaleString()}</span>
+                        <span className="text-gray-500">/course</span>
+                      </div>
+                      <ul className="space-y-3 mb-8">
+                        {plan.features.map((feature, i) => (
+                          <li key={i} className="flex items-center gap-3">
+                            <Check className="w-5 h-5 text-green-500" />
+                            <span className="text-gray-600">{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <Button 
+                        onClick={() => {
+                          setSelectedPlan(plan);
+                          setShowForm(true);
+                        }}
+                        className={`w-full rounded-full ${
+                          plan.popular 
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700' 
+                            : 'bg-gray-900 hover:bg-gray-800'
+                        }`}
+                      >
+                        Enroll Now
+                      </Button>
+                    </Card>
+                  ))}
                 </div>
-              </label>
+              </motion.div>
             </div>
           </section>
 
-          {/* PHOTO */}
-          <section className="pf-card">
-            <h3>Profile Photo</h3>
-            <div className="pf-grid">
-              <label>
-                Singer Photo
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  <input
-                    id="photo-file-main"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFile}
-                  />
-                  <div style={{ fontSize: 13 }}>
-                    {form.photo?.name ||
-                      (typeof form.photo === "string" && form.photo
-                        ? "Existing photo"
-                        : "No file chosen")}
-                  </div>
-                  {preview && (
-                    <img
-                      src={preview}
-                      alt="preview"
-                      style={{
-                        width: 84,
-                        height: 64,
-                        objectFit: "cover",
-                        borderRadius: 8,
-                      }}
-                    />
+          {/* Instructors */}
+          <section className="py-16">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8">
+              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                <h2 className="text-3xl font-bold text-center mb-12">Meet Our Instructors</h2>
+                <div className="grid md:grid-cols-3 gap-8">
+                  {instructors.map((instructor, idx) => (
+                    <Card key={idx} className="p-6 text-center">
+                      <img
+                        src={instructor.image}
+                        alt={instructor.name}
+                        className="w-24 h-24 rounded-full object-cover mx-auto mb-4 ring-4 ring-amber-100"
+                      />
+                      <h3 className="font-bold text-xl mb-1">{instructor.name}</h3>
+                      <p className="text-amber-600 font-medium mb-2">{instructor.specialty}</p>
+                      <p className="text-gray-500 text-sm">{instructor.experience} experience</p>
+                      <div className="flex justify-center mt-4">
+                        {[...Array(5)].map((_, i) => (
+                          <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+          </section>
+        </>
+      ) : (
+        /* Enrollment Form */
+        <section className="py-16">
+          <div className="max-w-2xl mx-auto px-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <Card className="p-8">
+                <div className="mb-8">
+                  <Button variant="ghost" onClick={() => setShowForm(false)} className="mb-4">
+                    ← Back to Plans
+                  </Button>
+                  <h2 className="text-2xl font-bold">Enrollment Form</h2>
+                  {selectedPlan && (
+                    <p className="text-amber-600 font-medium">{selectedPlan.name} - ₹{selectedPlan.price.toLocaleString()}</p>
                   )}
                 </div>
-              </label>
-            </div>
-          </section>
 
-          {/* ACTIONS */}
-          <div className="pf-actions">
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => {
-                setForm(emptyInitial);
-                if (preview) {
-                  URL.revokeObjectURL(preview);
-                  setPreview(null);
-                }
-                setEditingId(null);
-                setMode("list");
-              }}
-              disabled={saving}
-            >
-              Cancel
-            </button>
-            <button className="btn" type="submit" disabled={saving}>
-              {saving
-                ? "Saving..."
-                : editingId
-                ? "Update Singer"
-                : "Create Singer"}
-            </button>
-          </div>
-        </form>
-      )}
+                <div className="grid gap-6">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="first_name">First Name *</Label>
+                      <Input
+                        id="first_name"
+                        value={formData.first_name}
+                        onChange={(e) => setFormData({...formData, first_name: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="last_name">Last Name</Label>
+                      <Input
+                        id="last_name"
+                        value={formData.last_name}
+                        onChange={(e) => setFormData({...formData, last_name: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
 
-      {/* LIST MODE */}
-      {mode === "list" && (
-        <div className="pf-table-card">
-          <div className="pf-table-top">
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input
-                className="pf-search"
-                placeholder="Search singers..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") fetchSingers(searchText);
-                }}
-              />
-              <button
-                className="btn"
-                type="button"
-                onClick={() => fetchSingers(searchText)}
-              >
-                Search
-              </button>
-            </div>
-            <div className="pf-table-meta">
-              {loadingList ? "Loading..." : `${singers.length} singers`}
-            </div>
-          </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="phone">Phone Number *</Label>
+                      <Input
+                        id="phone"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        placeholder="+91 XXXXX XXXXX"
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({...formData, email: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
 
-          <div className="pf-table-wrap">
-            <table className="pf-table responsive-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Image</th>
-                  <th>Birth Date</th>
-                  <th>Mobile</th>
-                  <th>Profession</th>
-                  <th>Education</th>
-                  <th>Achievement</th>
-                  <th>Fav Singer</th>
-                  <th>Reference</th>
-                  <th>Genre</th>
-                  <th>City</th>
-                  <th>Annual Fee</th>
-                  <th>Payment</th>
-                  <th>Status</th>
-                  <th className="c">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {singers.map((s) => (
-                  <tr key={s.id}>
-                    <td className="td-name">
-                      <div className="name-strong">{s.name}</div>
-                      {s.area ? (
-                        <div className="muted small">{s.area}</div>
-                      ) : null}
-                    </td>
-                    <td>
-                      {s.photo ? (
-                        <img
-                          src={safeImageUrl(s.photo)}
-                          alt={s.name}
-                          className="thumb"
-                        />
-                      ) : (
-                        <span className="muted">—</span>
-                      )}
-                    </td>
-                    <td>{s.birth_date || "—"}</td>
-                    <td>{s.mobile || "—"}</td>
-                    <td>{s.profession || "—"}</td>
-                    <td>{s.education || "—"}</td>
-                    <td>{s.achievement || "—"}</td>
-                    <td>{s.favourite_singer || "—"}</td>
-                    <td>{s.reference_by || "—"}</td>
-                    <td>{s.genre || "—"}</td>
-                    <td>{s.city || "—"}</td>
-                    <td>₹ {fmtCurrency(s.rate)}</td>
-                    <td>{s.payment_method || "—"}</td>
-                    <td>
-                      <span className={`chip ${s.active ? "ok" : "muted"}`}>
-                        {s.active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="c">
-                      <button
-                        className="mini"
-                        type="button"
-                        onClick={() => loadSinger(s.id)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="mini danger"
-                        type="button"
-                        onClick={() => handleDelete(s.id)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {singers.length === 0 && !loadingList && (
-                  <tr>
-                    <td
-                      colSpan={15}
-                      style={{
-                        padding: 28,
-                        textAlign: "center",
-                        color: "#6b7280",
-                      }}
+                  <div>
+                    <Label htmlFor="address">Street Address</Label>
+                    <Input
+                      id="address"
+                      value={formData.street_address}
+                      onChange={(e) => setFormData({...formData, street_address: e.target.value})}
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        value={formData.city}
+                        onChange={(e) => setFormData({...formData, city: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        value={formData.state}
+                        onChange={(e) => setFormData({...formData, state: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="postal">Postal Code</Label>
+                      <Input
+                        id="postal"
+                        value={formData.postal_code}
+                        onChange={(e) => setFormData({...formData, postal_code: e.target.value})}
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="batch">Preferred Batch *</Label>
+                    <Select
+                      value={formData.preferred_batch}
+                      onValueChange={(value) => setFormData({...formData, preferred_batch: value})}
                     >
-                      No singers found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Select a batch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {batches.map((batch) => (
+                          <SelectItem key={batch.id} value={batch.id}>
+                            {batch.label} ({batch.time})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="reference">Reference By (Optional)</Label>
+                    <Input
+                      id="reference"
+                      value={formData.reference_by}
+                      onChange={(e) => setFormData({...formData, reference_by: e.target.value})}
+                      placeholder="Who referred you?"
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleEnroll}
+                    disabled={enrollMutation.isPending}
+                    className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 py-6 text-lg rounded-full"
+                  >
+                    {enrollMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 w-5 h-5 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      'Submit Enrollment'
+                    )}
+                  </Button>
+                </div>
+              </Card>
+            </motion.div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );
