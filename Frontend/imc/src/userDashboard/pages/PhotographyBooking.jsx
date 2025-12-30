@@ -2,13 +2,12 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import Footer from "../../components/Footer";
-import SingerBackground from "../../assets/singerbag.jpg"; // You can replace with event-themed image
+import SingerBackground from "../../assets/singerbag.jpg"; // Replace with photography-themed image if desired
 import {
   Loader2,
   CheckCircle,
   Calendar,
   Clock,
-  Mic,
   MapPin,
   Users,
   Phone,
@@ -23,35 +22,34 @@ import {
   FileText,
 } from "lucide-react";
 
-// API Configuration
+// API Configuration - Update if you have a specific endpoint
 const API_BASE = import.meta.env.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const PRIVATE_BOOKING_API = `${API_BASE.replace(/\/$/, "")}/auth/private-bookings/`;
+const PHOTOGRAPHY_API = `${API_BASE.replace(/\/$/, "")}/auth/photography-bookings/`; // Change as needed
 
-const EVENT_TYPES = [
-  "Wedding",
+const SHOOT_TYPES = [
+  "Wedding Photography",
   "Pre-Wedding Shoot",
+  "Maternity Shoot",
+  "Newborn/Baby Shoot",
+  "Family Portrait",
+  "Fashion/Portfolio",
+  "Product Photography",
+  "Corporate Headshots",
+  "Event Coverage",
   "Birthday Party",
-  "Anniversary",
-  "Corporate Event",
   "Engagement",
-  "Baby Shower",
-  "Housewarming",
-  "Private Concert",
-  "Fashion Shoot",
-  "Product Launch",
   "Other",
 ];
 
 const DURATION_OPTIONS = [
   "2 Hours",
   "4 Hours",
-  "6 Hours",
-  "8 Hours",
-  "Full Day (10+ Hours)",
+  "Half Day (6 Hours)",
+  "Full Day (8-10 Hours)",
   "Multi-Day",
 ];
 
-export default function PrivateEventBooking() {
+export default function PhotographyBooking() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -60,14 +58,14 @@ export default function PrivateEventBooking() {
     contact_number: "",
     email: "",
     address: "",
-    event_type: "",
-    venue: "",
+    shoot_type: "",
+    location: "",
     date: "",
     time_slot: "",
     duration: "",
-    guest_count: "",
+    people_count: "",
     notes: "",
-    reference_images: null, // For file upload
+    reference_images: null,
     agreed_terms: false,
   });
 
@@ -84,12 +82,11 @@ export default function PrivateEventBooking() {
     if (!form.customer.trim()) return "Full name is required";
     if (!form.contact_number.trim()) return "Contact number is required";
     if (!form.email.trim()) return "Email is required";
-    if (!form.event_type) return "Please select event type";
-    if (!form.venue.trim()) return "Venue is required";
+    if (!form.shoot_type) return "Please select shoot type";
+    if (!form.location.trim()) return "Location is required";
     if (!form.date) return "Date is required";
-    if (!form.time_slot.trim()) return "Time slot is required";
     if (!form.duration) return "Duration is required";
-    if (!form.guest_count || form.guest_count <= 0) return "Guest count must be greater than 0";
+    if (!form.people_count || form.people_count <= 0) return "Number of people must be greater than 0";
     if (!form.agreed_terms) return "You must agree to terms";
     return null;
   };
@@ -106,18 +103,18 @@ export default function PrivateEventBooking() {
     data.append("contact_number", form.contact_number.trim());
     data.append("email", form.email.trim());
     if (form.address.trim()) data.append("address", form.address.trim());
-    data.append("event_type", form.event_type);
-    data.append("venue", form.venue.trim());
+    data.append("shoot_type", form.shoot_type);
+    data.append("location", form.location.trim());
     data.append("date", form.date);
-    data.append("time_slot", form.time_slot.trim());
+    if (form.time_slot.trim()) data.append("time_slot", form.time_slot.trim());
     data.append("duration", form.duration);
-    data.append("guest_count", Number(form.guest_count));
+    data.append("people_count", Number(form.people_count));
     if (form.notes.trim()) data.append("notes", form.notes.trim());
     if (form.reference_images) data.append("reference_images", form.reference_images);
 
     try {
       setLoading(true);
-      await axios.post(PRIVATE_BOOKING_API, data, {
+      await axios.post(PHOTOGRAPHY_API, data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setSuccess(true);
@@ -136,12 +133,12 @@ export default function PrivateEventBooking() {
       contact_number: "",
       email: "",
       address: "",
-      event_type: "",
-      venue: "",
+      shoot_type: "",
+      location: "",
       date: "",
       time_slot: "",
       duration: "",
-      guest_count: "",
+      people_count: "",
       notes: "",
       reference_images: null,
       agreed_terms: false,
@@ -168,20 +165,20 @@ export default function PrivateEventBooking() {
             Booking Request Sent!
           </h2>
           <p className="text-gray-600 text-lg mb-10">
-            Thank you, {form.customer}! We’ve received your private event request. Our team will contact you within 24 hours with a custom quote.
+            Thank you, {form.customer}! Your photography booking request has been received. We’ll contact you soon with availability and quote.
           </p>
           <button
             onClick={resetForm}
             className="px-10 py-4 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition"
           >
-            Book Another Event
+            Book Another Shoot
           </button>
         </motion.div>
       </div>
     );
   }
 
-  // Main Booking Form
+  // Main Form
   return (
     <div className="bg-gradient-to-b from-slate-50 to-slate-100 min-h-screen flex flex-col">
       {/* HERO SECTION */}
@@ -197,10 +194,10 @@ export default function PrivateEventBooking() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
-              Private Event Booking
+              Photography Booking
             </h1>
             <p className="text-3xl md:text-4xl font-bold text-amber-400 mt-2 drop-shadow">
-              IMC Events & Entertainment
+              IMC Visual Arts
             </p>
           </motion.div>
           <motion.p
@@ -209,7 +206,7 @@ export default function PrivateEventBooking() {
             transition={{ delay: 0.3 }}
             className="text-lg text-white/90 mt-4 max-w-2xl"
           >
-            Professional singers, photography, videography, and sound for your special occasion
+            Professional photography for weddings, portraits, events, fashion, and more
           </motion.p>
         </div>
       </section>
@@ -227,8 +224,8 @@ export default function PrivateEventBooking() {
                 className="bg-white rounded-3xl shadow-2xl p-8 md:p-16"
               >
                 <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900 flex items-center justify-center gap-4">
-                  <Star className="w-12 h-12 text-amber-600" />
-                  Book Your Private Event
+                  <Camera className="w-12 h-12 text-amber-600" />
+                  Book Your Photoshoot
                 </h2>
 
                 {/* Personal Info */}
@@ -287,21 +284,21 @@ export default function PrivateEventBooking() {
                   </div>
                 </div>
 
-                {/* Event Details */}
+                {/* Shoot Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
                   <div>
                     <label className="block text-gray-700 font-medium mb-3">
-                      Event Type <span className="text-red-500">*</span>
+                      Type of Shoot <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <select
-                        name="event_type"
-                        value={form.event_type}
+                        name="shoot_type"
+                        value={form.shoot_type}
                         onChange={handleChange}
                         className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 appearance-none transition"
                       >
-                        <option value="">Select Event Type</option>
-                        {EVENT_TYPES.map((type) => (
+                        <option value="">Select Shoot Type</option>
+                        {SHOOT_TYPES.map((type) => (
                           <option key={type} value={type}>
                             {type}
                           </option>
@@ -313,21 +310,21 @@ export default function PrivateEventBooking() {
                   <div>
                     <label className="block text-gray-700 font-medium mb-3">
                       <MapPin className="inline w-5 h-5 mr-2" />
-                      Venue / Location <span className="text-red-500">*</span>
+                      Location <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
-                      name="venue"
-                      value={form.venue}
+                      name="location"
+                      value={form.location}
                       onChange={handleChange}
+                      placeholder="e.g. Marine Drive, Mumbai"
                       className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition"
-                      placeholder="e.g. Taj Hotel, Mumbai"
                     />
                   </div>
                   <div>
                     <label className="block text-gray-700 font-medium mb-3">
                       <Calendar className="inline w-5 h-5 mr-2" />
-                      Event Date <span className="text-red-500">*</span>
+                      Preferred Date <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="date"
@@ -341,14 +338,14 @@ export default function PrivateEventBooking() {
                   <div>
                     <label className="block text-gray-700 font-medium mb-3">
                       <Clock className="inline w-5 h-5 mr-2" />
-                      Time Slot <span className="text-red-500">*</span>
+                      Preferred Time (Optional)
                     </label>
                     <input
                       type="text"
                       name="time_slot"
                       value={form.time_slot}
                       onChange={handleChange}
-                      placeholder="e.g. 7:00 PM - 11:00 PM"
+                      placeholder="e.g. Golden hour / 4 PM onwards"
                       className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition"
                     />
                   </div>
@@ -376,15 +373,15 @@ export default function PrivateEventBooking() {
                   <div>
                     <label className="block text-gray-700 font-medium mb-3">
                       <Users className="inline w-5 h-5 mr-2" />
-                      Expected Guests <span className="text-red-500">*</span>
+                      Number of People <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
-                      name="guest_count"
-                      value={form.guest_count}
+                      name="people_count"
+                      value={form.people_count}
                       onChange={handleChange}
                       min="1"
-                      placeholder="e.g. 100"
+                      placeholder="e.g. 2 (couple) or 10 (family)"
                       className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition"
                     />
                   </div>
@@ -402,7 +399,7 @@ export default function PrivateEventBooking() {
                       <p className="text-gray-600">
                         <span className="text-amber-600 font-semibold">Click to upload</span> or drag and drop
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Images up to 10MB</p>
+                      <p className="text-xs text-gray-500 mt-1">Images up to 10MB (Pinterest links welcome)</p>
                       <input
                         type="file"
                         accept="image/*"
@@ -420,14 +417,14 @@ export default function PrivateEventBooking() {
                   <div>
                     <label className="block text-lg font-bold text-gray-800 mb-3">
                       <FileText className="inline w-6 h-6 mr-2" />
-                      Special Requests / Notes
+                      Special Requests / Style Preferences
                     </label>
                     <textarea
                       name="notes"
                       value={form.notes}
                       onChange={handleChange}
                       rows="6"
-                      placeholder="Theme, specific songs, lighting, photography style, etc."
+                      placeholder="e.g. Candid style, black & white edits, outdoor only, specific poses..."
                       className="w-full px-5 py-4 bg-gray-100 rounded-2xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 resize-none"
                     />
                   </div>
@@ -461,7 +458,7 @@ export default function PrivateEventBooking() {
                       Submitting Request...
                     </>
                   ) : (
-                    "Submit Booking Request"
+                    "Submit Photography Booking"
                   )}
                 </button>
               </motion.div>
@@ -478,28 +475,28 @@ export default function PrivateEventBooking() {
             >
               <h3 className="text-2xl font-bold mb-6 flex items-center gap-3">
                 <Sparkles className="w-8 h-8" />
-                What You Get
+                Why Choose Us
               </h3>
               <ul className="space-y-5 text-lg">
                 <li className="flex gap-4">
                   <Camera className="w-7 h-7 text-amber-300 flex-shrink-0" />
                   <div>
-                    <strong>Professional Coverage</strong><br />
-                    <span className="text-white/80">Photography & cinematic videography</span>
-                  </div>
-                </li>
-                <li className="flex gap-4">
-                  <Mic className="w-7 h-7 text-amber-300 flex-shrink-0" />
-                  <div>
-                    <strong>Live Music</strong><br />
-                    <span className="text-white/80">Talented singers & bands</span>
+                    <strong>Professional Gear</strong><br />
+                    <span className="text-white/80">Full-frame cameras, prime lenses, lighting</span>
                   </div>
                 </li>
                 <li className="flex gap-4">
                   <Star className="w-7 h-7 text-amber-300 flex-shrink-0" />
                   <div>
-                    <strong>Custom Packages</strong><br />
-                    <span className="text-white/80">Tailored to your vision & budget</span>
+                    <strong>Edited Gallery</strong><br />
+                    <span className="text-white/80">100+ hand-edited high-res photos</span>
+                  </div>
+                </li>
+                <li className="flex gap-4">
+                  <Award className="w-7 h-7 text-amber-300 flex-shrink-0" />
+                  <div>
+                    <strong>Experienced Team</strong><br />
+                    <span className="text-white/80">10+ years in wedding & portrait photography</span>
                   </div>
                 </li>
               </ul>
@@ -512,9 +509,9 @@ export default function PrivateEventBooking() {
               className="bg-white rounded-3xl p-8 shadow-xl border border-amber-100"
             >
               <Award className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-center mb-3">Premium Service</h3>
+              <h3 className="text-2xl font-bold text-center mb-3">Premium Experience</h3>
               <p className="text-gray-600 text-center">
-                Trusted by hundreds of clients for weddings, corporate events, and private celebrations across India.
+                Trusted by hundreds of clients for capturing life's most precious moments beautifully.
               </p>
             </motion.div>
           </div>

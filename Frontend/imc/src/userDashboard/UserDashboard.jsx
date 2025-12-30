@@ -1,110 +1,76 @@
-import React, { useRef, useEffect, useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-
-// Import reusable Footer
 import Footer from "../components/Footer.jsx";
-
 import heroVideo from "../assets/bharat.mp4";
+import { motion } from "framer-motion";
+import {
+  Mic2,
+  Users,
+  Camera,
+  Calendar,
+  Star,
+  Clock,
+  MapPin,
+  Speaker,
+  Sparkles,
+} from "lucide-react";
 
 export default function UserDashboard() {
-  const carouselRef = useRef(null);
-  const [isHovered, setIsHovered] = useState(false);
-
   const services = [
     {
-      tag: "MEMBERSHIP",
       title: "Club Membership",
-      desc: "Join our exclusive music community",
-      
       link: "/singer/register",
-      img: "https://thumbs.dreamstime.com/b/dj-celebrating-stage-arms-raised-vibrant-concert-dynamic-scene-standing-triumphantly-high-celebration-as-373546700.jpg",
+      img: "https://images.unsplash.com/photo-1514327605112-b887c0e61c0a?w=800&q=80",
+      icon: Sparkles,
     },
     {
-      tag: "STUDIO",
       title: "Studio Booking",
-      desc: "World-class recording & rehearsal rooms",
-
       link: "/studio-booking",
-      img: "https://images.stockcake.com/public/4/a/1/4a1dd2e0-ef33-4189-aeab-32d173e773e1_large/professional-recording-studio-stockcake.jpg",
+      img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80",
+      icon: Mic2,
     },
     {
-      tag: "CLASSES",
       title: "Singing Classes",
-      desc: "Professional vocal training with experts",
-     
       link: "/singing-classes",
-      img: "https://vocalgym.throga.com/wp-content/uploads/2022/02/website-1.jpg",
+      img: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800&q=80",
+      icon: Users,
     },
     {
-      tag: "PHOTOGRAPHY",
-      title: "Event Photography",
-      desc: "Capture your moments professionally",
-      
+      title: "Live Shows & Karaoke",
+      link: "/events",
+      img: "https://images.unsplash.com/photo-1507679799987-c737218594e0?w=800&q=80",
+      icon: Calendar,
+    },
+    {
+      title: "Private Events",
+      link: "/private-booking",
+      img: "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80",
+      icon: Star,
+    },
+    {
+      title: "Photography",
       link: "/photography-booking",
-      img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32",
+      img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80",
+      icon: Camera,
     },
     {
-      tag: "VIDEOGRAPHY",
-      title: "Music Videography",
-      desc: "Cinematic videos for your music",
-      
-      link: "/videography-booking",
-      img: "https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f",
+      title: "Videography",
+      link: "/videography",
+      img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80",
+      icon: Camera,
     },
     {
-      tag: "SOUND",
-      title: "Sound Services",
-      desc: "Premium audio setup & rental",
-     
-      link: "/studio-booking",
-      img: "https://images.unsplash.com/photo-1511379938547-c1f69419868d",
+      title: "Sound System",
+      link: "/sound-booking",
+      img: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80",
+      icon: Speaker,
     },
   ];
 
-  // Duplicate services for seamless infinite loop
-  const duplicatedServices = [...services, ...services, ...services];
-
-  // Auto-scroll effect
-  useEffect(() => {
-    if (isHovered || !carouselRef.current) return;
-
-    const scrollSpeed = 1; // pixels per frame
-    let animationFrame;
-
-    const scroll = () => {
-      if (carouselRef.current) {
-        carouselRef.current.scrollLeft += scrollSpeed;
-
-        // Reset scroll when reaching the duplicated section
-        if (carouselRef.current.scrollLeft >= carouselRef.current.scrollWidth / 3) {
-          carouselRef.current.scrollLeft = 0;
-        }
-      }
-      animationFrame = requestAnimationFrame(scroll);
-    };
-
-    animationFrame = requestAnimationFrame(scroll);
-
-    return () => cancelAnimationFrame(animationFrame);
-  }, [isHovered]);
-
-  // Manual scroll
-  const scrollLeft = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: -400, behavior: "smooth" });
-    }
-  };
-
-  const scrollRight = () => {
-    if (carouselRef.current) {
-      carouselRef.current.scrollBy({ left: 400, behavior: "smooth" });
-    }
-  };
-
   return (
-    <div className="bg-white text-gray-800 overflow-x-hidden min-h-screen flex flex-col">
-      {/* ================= HERO VIDEO ================= */}
-      <section className="relative h-[70vh] md:h-[80vh] flex items-center justify-center overflow-hidden">
+    <div className="bg-white min-h-screen">
+      {/* ================= HERO - UPGRADED & SUPER ATTRACTIVE ================= */}
+      <section className="relative h-screen flex items-center justify-center overflow-hidden">
         <video
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay
@@ -115,247 +81,231 @@ export default function UserDashboard() {
           <source src={heroVideo} type="video/mp4" />
         </video>
 
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/90" />
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 text-center text-white">
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black mb-6">
-            Where Music <span className="text-yellow-400">Comes Alive</span>
-          </h1>
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.6, ease: "easeOut" }}
+          className="relative z-10 text-center px-6 max-w-7xl mx-auto"
+        >
+          {/* Welcome Text */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5, duration: 1 }}
+            className="text-orange-400 font-bold text-2xl mb-8 tracking-widest"
+          >
+            WELCOME TO IMC MUSIC HUB
+          </motion.p>
 
-          <p className="text-lg md:text-2xl max-w-4xl mx-auto mb-10 text-gray-200">
-            Recording Studios • Singing Classes • Live Shows • Karaoke • Sound •
-            Photography • Videography
-          </p>
+          {/* Main Title */}
+          <motion.h1
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 1.2 }}
+            className="text-6xl md:text-8xl lg:text-9xl font-black mb-12 leading-tight text-white"
+          >
+            Where Music<br />
+            <span className="text-orange-500">Comes Alive</span>
+          </motion.h1>
 
-          <div className="flex justify-center gap-5 flex-wrap">
-            <Link
-              to="/services"
-              className="bg-yellow-400 text-black px-10 py-4 font-black rounded-full hover:bg-yellow-300 transition transform hover:scale-105"
-            >
-              Explore Services →
-            </Link>
+          {/* Description */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2, duration: 1 }}
+            className="text-xl md:text-3xl mb-20 text-gray-200 max-w-5xl mx-auto leading-relaxed font-medium"
+          >
+            Experience world-class studio recording, professional singing classes, spectacular live events, and premium audio-visual services — all under one roof.
+          </motion.p>
 
-            <Link
-              to="#upcoming-events"
-              className="border-2 border-white px-10 py-4 font-black rounded-full hover:bg-white/10 transition transform hover:scale-105"
-            >
-              View Events
-            </Link>
-          </div>
-        </div>
+          {/* CTA Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.6, duration: 0.8 }}
+            className="flex flex-col sm:flex-row gap-10 justify-center"
+          >
+          
+          </motion.div>
+        </motion.div>
       </section>
 
-      {/* ================= SERVICES - CONTINUOUS INFINITE CAROUSEL ================= */}
-      <section className="py-24 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-black mb-4">
-              Our Premium Services
+      {/* ================= OUR SERVICES ================= */}
+      <section className="py-32 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <p className="text-orange-500 font-bold text-xl mb-4 tracking-wider">
+              WHAT WE OFFER
+            </p>
+            <h2 className="text-6xl md:text-7xl font-black mb-8 text-gray-800">
+              Our Services
             </h2>
-            <p className="text-gray-600 text-lg">
-              Professional facilities and experiences for every musician
+            <p className="text-2xl text-gray-600 max-w-4xl mx-auto">
+              From recording studios to live events, we provide everything you need for your musical journey
             </p>
           </div>
 
-          <div
-            className="relative"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-          >
-            {/* Carousel */}
-            <div
-              ref={carouselRef}
-              className="flex overflow-x-hidden gap-8"
-            >
-              {duplicatedServices.map((service, i) => (
-                <div
-                  key={i}
-                  className="flex-none w-full sm:w-1/2 lg:w-1/3"
-                >
-                  <div className="relative rounded-3xl overflow-hidden shadow-2xl h-full group">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
+            {services.map((service, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 60 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1, duration: 0.8 }}
+                whileHover={{ y: -10 }}
+                className="group"
+              >
+                <Link to={service.link}>
+                  <div className="relative rounded-3xl overflow-hidden shadow-2xl h-96 group-hover:shadow-3xl transition-all duration-700">
                     <img
                       src={service.img}
                       alt={service.title}
-                      className="h-96 w-full object-cover group-hover:scale-110 transition duration-700"
+                      className="w-full h-full object-cover group-hover:scale-110 transition duration-1000"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
 
-                    <div className="absolute top-6 left-6">
-                      <span className="bg-yellow-400 text-black px-5 py-2 rounded-full font-bold text-sm uppercase tracking-wider">
-                        {service.tag}
-                      </span>
-                    </div>
-
-                    <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                      <h3 className="text-3xl font-black mb-2">{service.title}</h3>
-                      <p className="text-gray-200 mb-6">{service.desc}</p>
-
-                      <div className="flex justify-between items-end">
-                        <p className="text-3xl font-black">{service.price}</p>
-                        <Link
-                          to={service.link}
-                          className="bg-yellow-400 text-black px-8 py-4 rounded-full font-bold hover:bg-yellow-300 transition transform hover:scale-110 shadow-xl"
-                        >
-                          Book Now
-                        </Link>
+                    {/* Small Icon in bottom-left */}
+                    <div className="absolute bottom-8 left-8">
+                      <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center shadow-xl">
+                        <service.icon className="w-10 h-10 text-white" />
                       </div>
                     </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 p-10 text-white">
+                      <h3 className="text-3xl font-black mb-4">{service.title}</h3>
+                      <p className="text-gray-300 leading-relaxed">
+                        {service.desc}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Navigation Arrows */}
-            <button
-              onClick={scrollLeft}
-              className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black text-white w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-2xl z-10"
-            >
-              ←
-            </button>
-            <button
-              onClick={scrollRight}
-              className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/70 hover:bg-black text-white w-14 h-14 rounded-full flex items-center justify-center text-3xl shadow-2xl z-10"
-            >
-              →
-            </button>
+                </Link>
+              </motion.div>
+            ))}
           </div>
-
-          
         </div>
       </section>
 
       {/* ================= UPCOMING EVENTS ================= */}
-      <section id="upcoming-events" className="py-28 bg-black text-white">
+      <section className="py-32 bg-gradient-to-b from-[#FFF8E1] to-[#FFEDD5]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-black mb-4">
-              Upcoming Events & Workshops
-            </h2>
-            <p className="text-gray-300 text-lg">
-              Join us for exciting live performances and training sessions
+          <div className="text-center mb-20">
+            <p className="text-orange-600 font-bold text-xl mb-4 tracking-wider">
+              DON'T MISS OUT
             </p>
+            <h2 className="text-6xl md:text-7xl font-black mb-8 text-gray-800">
+              Upcoming Events
+            </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {[
               {
                 tag: "WORKSHOP",
-                title: "Vocal Training Workshop",
-                date: "08 Mar 2025",
+                title: "Vocal Workshop with Experts",
+                date: "Mar 08, 2025",
+                time: "10:00 AM",
+                venue: "IMC Training Room",
                 price: "₹1499",
-                img: "https://www.ensembleschools.com/the-inside-voice/wp-content/uploads/sites/47/2023/11/mollys-music-group-lessons.jpg",
               },
               {
                 tag: "CONCERT",
-                title: "Classical Music Night",
-                date: "01 Mar 2025",
+                title: "Classical Music Evening",
+                date: "Mar 01, 2025",
+                time: "6:30 PM",
+                venue: "IMC Grand Hall",
                 price: "₹799",
-                img: "https://static.wixstatic.com/media/fbd6ab_ec3c65ff7ecd4da580d6a35cc5d95d5b~mv2.jpeg",
               },
               {
                 tag: "KARAOKE",
-                title: "Friday Karaoke Party",
-                date: "22 Feb 2025",
+                title: "Karaoke Night Special",
+                date: "Feb 22, 2025",
+                time: "8:00 PM",
+                venue: "IMC Lounge",
                 price: "₹299",
-                img: "https://thumbs.dreamstime.com/b/asian-friends-singing-microphone-karaoke-party.jpg",
               },
             ].map((event, i) => (
-              <div key={i} className="relative rounded-3xl overflow-hidden shadow-2xl group">
-                <img
-                  src={event.img}
-                  alt={event.title}
-                  className="h-96 w-full object-cover group-hover:scale-110 transition duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 60 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.2 }}
+                whileHover={{ y: -15 }}
+                className="bg-white rounded-3xl overflow-hidden shadow-2xl border border-orange-100"
+              >
+                <div className="h-6 bg-gradient-to-r from-orange-400 to-orange-600" />
 
-                <div className="absolute top-6 left-6">
-                  <span className="bg-yellow-400 text-black px-5 py-2 rounded-full font-bold text-sm uppercase tracking-wider">
+                <div className="p-10">
+                  <span className="inline-block bg-orange-500 text-white px-8 py-3 rounded-full font-bold text-lg mb-8">
                     {event.tag}
                   </span>
-                </div>
 
-                <div className="absolute bottom-0 left-0 right-0 p-8">
-                  <h3 className="text-3xl font-black mb-2">{event.title}</h3>
-                  <p className="text-gray-200 text-xl mb-6">{event.date}</p>
+                  <h3 className="text-3xl font-black text-gray-800 mb-6">{event.title}</h3>
+                  <p className="text-gray-600 mb-3 flex items-center gap-3">
+                    <Calendar className="w-6 h-6 text-orange-500" />
+                    {event.date}
+                  </p>
+                  <p className="text-gray-600 mb-3 flex items-center gap-3">
+                    <Clock className="w-6 h-6 text-orange-500" />
+                    {event.time}
+                  </p>
+                  <p className="text-gray-600 mb-10 flex items-center gap-3">
+                    <MapPin className="w-6 h-6 text-orange-500" />
+                    {event.venue}
+                  </p>
 
-                  <div className="flex justify-between items-end">
-                    <p className="text-4xl font-black">{event.price}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-4xl font-black text-orange-600">{event.price}</p>
                     <Link
                       to="/events-booking"
-                      className="bg-yellow-400 text-black px-8 py-4 rounded-full font-bold hover:bg-yellow-300 transition transform hover:scale-110 shadow-xl"
+                      className="px-10 py-5 bg-orange-500 text-white rounded-full font-black text-xl hover:bg-orange-600 transform hover:scale-110 transition-all duration-500 shadow-xl"
                     >
                       Book Now
                     </Link>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
-
-          
         </div>
       </section>
 
       {/* ================= CTA ================= */}
-      <section
-        className="py-20 text-white bg-cover bg-center"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(234,88,12,.9),rgba(194,65,12,.95)),url('https://images.unsplash.com/photo-1511379938547-c1f69419868d')",
-        }}
-      >
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h2 className="text-4xl md:text-5xl font-black mb-4">
-              Ready to Start Your Musical Journey?
+      <section className="py-24 bg-gradient-to-br from-[#FFF8E1] to-[#FFEDD5]">
+        <div className="max-w-5xl mx-auto px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+          >
+            <h2 className="text-5xl md:text-6xl font-black mb-8 text-gray-800">
+              Ready to Make<br />
+              <span className="text-orange-600">Music Magic?</span>
             </h2>
-            <p className="text-orange-100 mb-8 text-lg">
-              Join IMC Music Club today and unlock a world of musical possibilities.
+
+            <p className="text-xl text-gray-700 mb-12 max-w-3xl mx-auto leading-relaxed">
+              Join thousands of artists who have found their musical home at IMC
             </p>
 
-            <Link
-              to="/membership"
-              className="bg-white text-orange-600 px-8 py-4 rounded-full font-black hover:bg-gray-100 transition inline-block transform hover:scale-105"
-            >
-              Become a Member →
-            </Link>
-          </div>
-
-          <div className="bg-white/20 backdrop-blur-xl rounded-2xl p-8">
-            <h3 className="text-2xl font-black mb-6">Quick Contact</h3>
-
-            <a
-              href="https://wa.me/919999999999"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-5 bg-white/20 p-5 rounded-xl mb-5 hover:bg-white/30 transition"
-            >
-              <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-3xl">
-                💬
-              </div>
-              <div>
-                <p className="font-bold text-lg">WhatsApp Us</p>
-                <p className="text-orange-100">Get instant response</p>
-              </div>
-            </a>
-
-            <a
-              href="tel:+919999999999"
-              className="flex items-center gap-5 bg-white/20 p-5 rounded-xl hover:bg-white/30 transition"
-            >
-              <div className="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center text-black text-3xl">
-                📞
-              </div>
-              <div>
-                <p className="font-bold text-lg">Call Us</p>
-                <p className="text-orange-100">+91 99999 99999</p>
-              </div>
-            </a>
-          </div>
+            <div className="flex flex-col sm:flex-row gap-10 justify-center">
+              <Link
+                to="/services"
+                className="px-20 py-6 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full font-bold text-white text-2xl shadow-xl hover:shadow-orange-500/40 transform hover:scale-105 transition-all duration-300"
+              >
+                Get Started →
+              </Link>
+              <Link
+                to="/contact"
+                className="px-20 py-6 border-4 border-orange-600 rounded-full font-bold text-orange-600 text-2xl bg-white hover:bg-orange-50 transform hover:scale-105 transition-all duration-300"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ================= REUSABLE FOOTER ================= */}
       <Footer />
     </div>
   );

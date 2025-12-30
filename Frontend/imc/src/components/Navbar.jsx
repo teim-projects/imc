@@ -13,6 +13,7 @@ import {
   faUser,
   faGear,
   faRightFromBracket,
+  faTicketAlt, // ← New icon for My Bookings
 } from "@fortawesome/free-solid-svg-icons";
 import logo from "../assets/logo.png";
 
@@ -220,6 +221,15 @@ const Navbar = () => {
                         <FontAwesomeIcon icon={faUser} /> Profile
                       </Link>
 
+                      {/* NEW: My Bookings in Desktop Dropdown */}
+                      <Link
+                        to="/my-bookings"
+                        style={styles.menuItem}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        <FontAwesomeIcon icon={faTicketAlt} /> My Bookings
+                      </Link>
+
                       {!isAdmin && (
                         <Link
                           to="/settings"
@@ -256,7 +266,7 @@ const Navbar = () => {
         </div>
       </nav>
 
-      {/* ================= MOBILE SIDEBAR - NOW SCROLLABLE ================= */}
+      {/* ================= MOBILE SIDEBAR ================= */}
       {sidebarOpen && (
         <>
           <div
@@ -319,7 +329,7 @@ const Navbar = () => {
               </div>
             </div>
 
-            {/* SIDEBAR FOOTER */}
+            {/* SIDEBAR FOOTER - Now includes My Bookings */}
             <div style={styles.sidebarFooter}>
               <Link
                 to="/profile"
@@ -327,6 +337,15 @@ const Navbar = () => {
                 onClick={() => setSidebarOpen(false)}
               >
                 <FontAwesomeIcon icon={faUser} /> Profile
+              </Link>
+
+              {/* NEW: My Bookings in Mobile Sidebar */}
+              <Link
+                to="/my-bookings"
+                style={styles.sidebarFooterLink}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <FontAwesomeIcon icon={faTicketAlt} /> My Bookings
               </Link>
 
               {!isAdmin && (
@@ -350,7 +369,7 @@ const Navbar = () => {
   );
 };
 
-/* ================= STYLES ================= */
+/* ================= STYLES (unchanged except minor tweaks) ================= */
 const styles = {
   navbar: {
     display: "flex",
@@ -476,7 +495,7 @@ const styles = {
     background: "#fff",
     borderRadius: 16,
     padding: 12,
-    minWidth: 240,
+    minWidth: 260,
     boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
     zIndex: 100,
   },
@@ -538,7 +557,7 @@ const styles = {
     padding: "30px 24px",
     color: "#fff",
     position: "relative",
-    minHeight: "140px", // Prevents collapse
+    minHeight: "140px",
   },
   sidebarProfile: {
     display: "flex",
@@ -562,10 +581,9 @@ const styles = {
   sidebarName: { fontSize: "20px", fontWeight: "700" },
   sidebarEmail: { fontSize: "14px", opacity: 0.9 },
 
-  // NEW: Scrollable links container
   sidebarLinksContainer: {
     flex: 1,
-    overflowY: "auto", // ← This makes it scrollable!
+    overflowY: "auto",
     padding: "0 24px",
   },
   sidebarLinks: {

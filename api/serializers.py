@@ -764,51 +764,14 @@ class SingerSerializer(serializers.ModelSerializer):
 # Singing class  (Service)
 # ---------------------------------------------------------------------
 # api/serializers.py
-import re
 from rest_framework import serializers
 from .models import SingingClass
 
 
 class SingingClassSerializer(serializers.ModelSerializer):
-    """
-    Serializer for SingingClass.
-    Exposes: day, time_slot, preferred_batch, fee, etc.
-    """
-
     class Meta:
         model = SingingClass
         fields = "__all__"
-        read_only_fields = ("date", "created_at")
-
-    def validate_phone(self, value):
-        if not value:
-            raise serializers.ValidationError("Phone is required.")
-        # very loose validation: digits, +, space, dash
-        if not re.match(r"^[0-9+\-\s]{8,20}$", value):
-            raise serializers.ValidationError("Enter a valid phone number.")
-        return value
-
-    def validate_fee(self, value):
-        if value is None or value < 0:
-            raise serializers.ValidationError("Fee must be ≥ 0.")
-        return value
-
-    def validate(self, attrs):
-        # Ensure day + time_slot present
-        day = attrs.get("day") or getattr(self.instance, "day", None)
-        slot = attrs.get("time_slot") or getattr(self.instance, "time_slot", None)
-        if not day:
-            raise serializers.ValidationError({"day": "Day is required."})
-        if not slot:
-            raise serializers.ValidationError({"time_slot": "Time slot is required."})
-
-        # Ensure terms accepted on create
-        agreed = attrs.get("agreed_terms")
-        if self.instance is None and not agreed:
-            raise serializers.ValidationError(
-                {"agreed_terms": "You must accept terms & conditions."}
-            )
-        return attrs
 
 
 

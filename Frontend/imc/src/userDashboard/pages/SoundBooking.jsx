@@ -2,19 +2,19 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import Footer from "../../components/Footer";
-import SingerBackground from "../../assets/singerbag.jpg"; // You can replace with event-themed image
+import SingerBackground from "../../assets/singerbag.jpg"; // You can replace with sound system image
 import {
   Loader2,
   CheckCircle,
   Calendar,
   Clock,
-  Mic,
   MapPin,
+  Mic,
   Users,
   Phone,
   Mail,
   User,
-  Camera,
+  Speaker,
   Upload,
   ChevronDown,
   Sparkles,
@@ -25,21 +25,16 @@ import {
 
 // API Configuration
 const API_BASE = import.meta.env.VITE_BASE_API_URL || "http://127.0.0.1:8000";
-const PRIVATE_BOOKING_API = `${API_BASE.replace(/\/$/, "")}/auth/private-bookings/`;
+const SOUND_BOOKING_API = `${API_BASE.replace(/\/$/, "")}/auth/sound-bookings/`; // Change if your endpoint is different
 
-const EVENT_TYPES = [
-  "Wedding",
-  "Pre-Wedding Shoot",
-  "Birthday Party",
-  "Anniversary",
-  "Corporate Event",
-  "Engagement",
-  "Baby Shower",
-  "Housewarming",
-  "Private Concert",
-  "Fashion Shoot",
-  "Product Launch",
-  "Other",
+const SYSTEM_TYPES = [
+  "Basic PA System",
+  "DJ Setup",
+  "Concert Sound System",
+  "Wireless Microphones",
+  "Stage Lighting + Sound",
+  "Full Event Package",
+  "Custom Setup",
 ];
 
 const DURATION_OPTIONS = [
@@ -51,7 +46,7 @@ const DURATION_OPTIONS = [
   "Multi-Day",
 ];
 
-export default function PrivateEventBooking() {
+export default function SoundBooking() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
@@ -60,14 +55,14 @@ export default function PrivateEventBooking() {
     contact_number: "",
     email: "",
     address: "",
-    event_type: "",
+    system_type: "",
     venue: "",
     date: "",
     time_slot: "",
     duration: "",
     guest_count: "",
     notes: "",
-    reference_images: null, // For file upload
+    reference_images: null,
     agreed_terms: false,
   });
 
@@ -84,7 +79,7 @@ export default function PrivateEventBooking() {
     if (!form.customer.trim()) return "Full name is required";
     if (!form.contact_number.trim()) return "Contact number is required";
     if (!form.email.trim()) return "Email is required";
-    if (!form.event_type) return "Please select event type";
+    if (!form.system_type) return "Please select system type";
     if (!form.venue.trim()) return "Venue is required";
     if (!form.date) return "Date is required";
     if (!form.time_slot.trim()) return "Time slot is required";
@@ -106,7 +101,7 @@ export default function PrivateEventBooking() {
     data.append("contact_number", form.contact_number.trim());
     data.append("email", form.email.trim());
     if (form.address.trim()) data.append("address", form.address.trim());
-    data.append("event_type", form.event_type);
+    data.append("system_type", form.system_type);
     data.append("venue", form.venue.trim());
     data.append("date", form.date);
     data.append("time_slot", form.time_slot.trim());
@@ -117,7 +112,7 @@ export default function PrivateEventBooking() {
 
     try {
       setLoading(true);
-      await axios.post(PRIVATE_BOOKING_API, data, {
+      await axios.post(SOUND_BOOKING_API, data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setSuccess(true);
@@ -136,7 +131,7 @@ export default function PrivateEventBooking() {
       contact_number: "",
       email: "",
       address: "",
-      event_type: "",
+      system_type: "",
       venue: "",
       date: "",
       time_slot: "",
@@ -168,13 +163,13 @@ export default function PrivateEventBooking() {
             Booking Request Sent!
           </h2>
           <p className="text-gray-600 text-lg mb-10">
-            Thank you, {form.customer}! We’ve received your private event request. Our team will contact you within 24 hours with a custom quote.
+            Thank you, {form.customer}! We’ve received your sound system request. Our team will contact you within 24 hours with a custom quote.
           </p>
           <button
             onClick={resetForm}
             className="px-10 py-4 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition"
           >
-            Book Another Event
+            Book Another System
           </button>
         </motion.div>
       </div>
@@ -197,10 +192,10 @@ export default function PrivateEventBooking() {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
-              Private Event Booking
+              Sound System Booking
             </h1>
             <p className="text-3xl md:text-4xl font-bold text-amber-400 mt-2 drop-shadow">
-              IMC Events & Entertainment
+              IMC Sound & Lighting
             </p>
           </motion.div>
           <motion.p
@@ -209,7 +204,7 @@ export default function PrivateEventBooking() {
             transition={{ delay: 0.3 }}
             className="text-lg text-white/90 mt-4 max-w-2xl"
           >
-            Professional singers, photography, videography, and sound for your special occasion
+            Professional PA systems, DJ setup, microphones, and lighting for events of any size
           </motion.p>
         </div>
       </section>
@@ -227,8 +222,8 @@ export default function PrivateEventBooking() {
                 className="bg-white rounded-3xl shadow-2xl p-8 md:p-16"
               >
                 <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-gray-900 flex items-center justify-center gap-4">
-                  <Star className="w-12 h-12 text-amber-600" />
-                  Book Your Private Event
+                  <Speaker className="w-12 h-12 text-amber-600" />
+                  Book Your Sound System
                 </h2>
 
                 {/* Personal Info */}
@@ -291,17 +286,17 @@ export default function PrivateEventBooking() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
                   <div>
                     <label className="block text-gray-700 font-medium mb-3">
-                      Event Type <span className="text-red-500">*</span>
+                      System Type <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <select
-                        name="event_type"
-                        value={form.event_type}
+                        name="system_type"
+                        value={form.system_type}
                         onChange={handleChange}
                         className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 appearance-none transition"
                       >
-                        <option value="">Select Event Type</option>
-                        {EVENT_TYPES.map((type) => (
+                        <option value="">Select System</option>
+                        {SYSTEM_TYPES.map((type) => (
                           <option key={type} value={type}>
                             {type}
                           </option>
@@ -320,8 +315,8 @@ export default function PrivateEventBooking() {
                       name="venue"
                       value={form.venue}
                       onChange={handleChange}
+                      placeholder="e.g. Community Hall, Andheri"
                       className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition"
-                      placeholder="e.g. Taj Hotel, Mumbai"
                     />
                   </div>
                   <div>
@@ -348,7 +343,7 @@ export default function PrivateEventBooking() {
                       name="time_slot"
                       value={form.time_slot}
                       onChange={handleChange}
-                      placeholder="e.g. 7:00 PM - 11:00 PM"
+                      placeholder="e.g. 6:00 PM - 11:00 PM"
                       className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition"
                     />
                   </div>
@@ -384,7 +379,7 @@ export default function PrivateEventBooking() {
                       value={form.guest_count}
                       onChange={handleChange}
                       min="1"
-                      placeholder="e.g. 100"
+                      placeholder="e.g. 150"
                       className="w-full h-12 px-5 bg-gray-100 rounded-xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 transition"
                     />
                   </div>
@@ -394,8 +389,8 @@ export default function PrivateEventBooking() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
                   <div>
                     <label className="block text-lg font-bold text-gray-800 mb-3">
-                      <Camera className="inline w-6 h-6 mr-2" />
-                      Reference Images / Mood Board (Optional)
+                      <Speaker className="inline w-6 h-6 mr-2" />
+                      Reference Images / Stage Layout (Optional)
                     </label>
                     <label className="border-2 border-dashed border-gray-300 rounded-2xl p-8 text-center bg-gray-50 flex flex-col items-center cursor-pointer hover:border-amber-400 transition">
                       <Upload className="w-12 h-12 text-gray-400 mb-4" />
@@ -427,7 +422,7 @@ export default function PrivateEventBooking() {
                       value={form.notes}
                       onChange={handleChange}
                       rows="6"
-                      placeholder="Theme, specific songs, lighting, photography style, etc."
+                      placeholder="Microphones needed, lighting, DJ booth, stage size, etc."
                       className="w-full px-5 py-4 bg-gray-100 rounded-2xl border border-gray-300 focus:outline-none focus:border-amber-500 focus:ring-4 focus:ring-amber-100 resize-none"
                     />
                   </div>
@@ -482,24 +477,24 @@ export default function PrivateEventBooking() {
               </h3>
               <ul className="space-y-5 text-lg">
                 <li className="flex gap-4">
-                  <Camera className="w-7 h-7 text-amber-300 flex-shrink-0" />
+                  <Speaker className="w-7 h-7 text-amber-300 flex-shrink-0" />
                   <div>
-                    <strong>Professional Coverage</strong><br />
-                    <span className="text-white/80">Photography & cinematic videography</span>
+                    <strong>Crystal Clear Sound</strong><br />
+                    <span className="text-white/80">Professional PA systems & speakers</span>
                   </div>
                 </li>
                 <li className="flex gap-4">
                   <Mic className="w-7 h-7 text-amber-300 flex-shrink-0" />
                   <div>
-                    <strong>Live Music</strong><br />
-                    <span className="text-white/80">Talented singers & bands</span>
+                    <strong>Wireless Microphones</strong><br />
+                    <span className="text-white/80">Freedom of movement on stage</span>
                   </div>
                 </li>
                 <li className="flex gap-4">
                   <Star className="w-7 h-7 text-amber-300 flex-shrink-0" />
                   <div>
-                    <strong>Custom Packages</strong><br />
-                    <span className="text-white/80">Tailored to your vision & budget</span>
+                    <strong>Full Lighting</strong><br />
+                    <span className="text-white/80">DJ & stage lighting included</span>
                   </div>
                 </li>
               </ul>
@@ -512,9 +507,9 @@ export default function PrivateEventBooking() {
               className="bg-white rounded-3xl p-8 shadow-xl border border-amber-100"
             >
               <Award className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-center mb-3">Premium Service</h3>
+              <h3 className="text-2xl font-bold text-center mb-3">Premium Audio</h3>
               <p className="text-gray-600 text-center">
-                Trusted by hundreds of clients for weddings, corporate events, and private celebrations across India.
+                Trusted by over 500 events for flawless sound and lighting across India.
               </p>
             </motion.div>
           </div>

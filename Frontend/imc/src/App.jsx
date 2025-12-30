@@ -4,11 +4,11 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  useLocation,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
-/* ---------------- COMMON ---------------- */
+/* ================= COMMON ================= */
 import Navbar from "./components/Navbar";
 import Login from "./components/Login";
 import Register from "./components/Register";
@@ -18,51 +18,57 @@ import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
 import HeroCarousel from "./components/HeroCarousel";
 
-/* ---------------- USER DASHBOARD ---------------- */
+/* ================= USER DASHBOARD ================= */
 import UserDashboard from "./userDashboard/UserDashboard";
 
-/* ---------------- PAGES ---------------- */
+/* ================= PAGES ================= */
 import Services from "./userDashboard/pages/Services";
 import Events from "./userDashboard/pages/Events";
 import Contact from "./userDashboard/pages/Contact";
 import SingingClass from "./userDashboard/pages/SingingClass";
 import SingerRegistration from "./userDashboard/pages/SingerRegistration";
 
-/* ---------------- SERVICE HOME PAGES ---------------- */
+/* ================= NEW: MY BOOKINGS & SOUND BOOKING PAGES ================= */
+import MyBookings from "./userDashboard/pages/MyBookings";
+import SoundBooking from "./userDashboard/pages/SoundBooking";   // ← ADDED: Sound Booking page
+
+/* ================= SERVICE HOME PAGES ================= */
 import StudioHomePage from "./userDashboard/studio/HomePage";
 import EventHomePage from "./userDashboard/Events/HomePage";
 import SingerHomePage from "./userDashboard/singer/HomePage";
 
-/* ---------------- FORMS ---------------- */
+/* ================= EXTRA SERVICE PAGES ================= */
+import PrivateBooking from "./userDashboard/pages/PrivateBooking";
+import PhotographyBooking from "./userDashboard/pages/PhotographyBooking";
+import VideographyPage from "./userDashboard/pages/VideographyPage";
+
+/* ================= FORMS ================= */
 import SingerForm from "./components/Forms/SingerForm";
 import UserStudioRentalForm from "./userDashboard/Forms/UserStudioRentalForm";
 import UserPhotographyBookingForm from "./userDashboard/Forms/UserPhotographyBookingForm";
 import UserEventBookingForm from "./userDashboard/Forms/UserEvents";
 
-/* ---------------- PAYMENT ---------------- */
+/* ================= PAYMENT ================= */
 import PaymentPage from "./userDashboard/payment/PaymentPage";
 
-/* ---------------- ASSETS ---------------- */
+/* ================= ASSETS ================= */
 import "./App.css";
 import Img1 from "./assets/banner.jpg";
 import Img2 from "./assets/banner1.jpg";
 
-/* ---------------- AUTH HELPERS ---------------- */
+/* ================= AUTH HELPERS ================= */
 const getUserInfo = () => {
   const token = localStorage.getItem("access");
-  const rawUser = localStorage.getItem("user");
   let user = null;
-
   try {
-    user = rawUser ? JSON.parse(rawUser) : null;
+    user = JSON.parse(localStorage.getItem("user"));
   } catch {
     user = null;
   }
-
   return { token, user };
 };
 
-/* ---------------- ROUTE GUARDS ---------------- */
+/* ================= ROUTE GUARDS ================= */
 function PrivateRoute({ children }) {
   const { token } = getUserInfo();
   if (!token) return <Navigate to="/login" replace />;
@@ -74,13 +80,12 @@ function AdminRoute({ children }) {
   if (!token) return <Navigate to="/login" replace />;
 
   const role = (user?.role || "").toLowerCase();
-  const isSuper = !!user?.is_superuser;
+  if (role === "admin" || user?.is_superuser) return children;
 
-  if (role === "admin" || isSuper) return children;
   return <Navigate to="/user-dashboard" replace />;
 }
 
-/* ---------------- HOME HERO ---------------- */
+/* ================= HERO ================= */
 function HomeHero() {
   const slides = [
     {
@@ -104,7 +109,7 @@ function HomeHero() {
   );
 }
 
-/* ---------------- LAYOUT ---------------- */
+/* ================= LAYOUT ================= */
 function Layout() {
   const location = useLocation();
   const showHero = location.pathname === "/";
@@ -116,6 +121,7 @@ function Layout() {
 
       <main className="app-main">
         <Routes>
+
           {/* HOME */}
           <Route path="/" element={<div />} />
 
@@ -166,25 +172,38 @@ function Layout() {
             }
           />
 
-          {/* MAIN PAGES */}
-          <Route path="/services" element={<Services />} />
-          <Route path="/events" element={<Events />} />
-          <Route path="/contact" element={<Contact />} />
-
-          {/* SINGER REGISTRATION PAGE */}
-          <Route path="/singer" element={<SingerRegistration />} />
-
-          {/* SINGING CLASSES - THIS IS WHERE YOUR MANAGEMENT PAGE IS */}
+          {/* MY BOOKINGS */}
           <Route
-            path="/singing-classes"
+            path="/my-bookings"
             element={
               <PrivateRoute>
-                <SingingClass />
+                <MyBookings />
               </PrivateRoute>
             }
           />
 
-          {/* BOOKINGS */}
+          {/* PUBLIC */}
+          <Route path="/services" element={<Services />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/contact" element={<Contact />} />
+
+          {/* CLASSES */}
+          <Route path="/classes" element={<SingingClass />} />
+          <Route path="/singing-classes" element={<Navigate to="/classes" replace />} />
+
+          {/* SINGER REGISTRATION */}
+          <Route path="/singer" element={<SingerRegistration />} />
+
+          {/* STUDIO */}
+          <Route
+            path="/studio"
+            element={
+              <PrivateRoute>
+                <StudioHomePage />
+              </PrivateRoute>
+            }
+          />
+
           <Route
             path="/studio-booking"
             element={
@@ -193,6 +212,7 @@ function Layout() {
               </PrivateRoute>
             }
           />
+
           <Route
             path="/studio-booking/form"
             element={
@@ -202,6 +222,7 @@ function Layout() {
             }
           />
 
+          {/* EVENTS */}
           <Route
             path="/events-booking"
             element={
@@ -210,6 +231,7 @@ function Layout() {
               </PrivateRoute>
             }
           />
+
           <Route
             path="/events-booking/form"
             element={
@@ -219,15 +241,37 @@ function Layout() {
             }
           />
 
+          {/* PHOTOGRAPHY */}
           <Route
             path="/photography-booking"
             element={
               <PrivateRoute>
-                <UserPhotographyBookingForm />
+                <PhotographyBooking />
               </PrivateRoute>
             }
           />
 
+          {/* VIDEOGRAPHY */}
+          <Route
+            path="/videography"
+            element={
+              <PrivateRoute>
+                <VideographyPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* PRIVATE BOOKING */}
+          <Route
+            path="/private-booking"
+            element={
+              <PrivateRoute>
+                <PrivateBooking />
+              </PrivateRoute>
+            }
+          />
+
+          {/* SINGER BOOKING */}
           <Route
             path="/singer-booking"
             element={
@@ -237,11 +281,12 @@ function Layout() {
             }
           />
 
+          {/* NEW: SOUND SYSTEM BOOKING */}
           <Route
-            path="/singer/register"
+            path="/sound-booking"
             element={
               <PrivateRoute>
-                <SingerForm initialMode="form" />
+                <SoundBooking />
               </PrivateRoute>
             }
           />
@@ -261,9 +306,10 @@ function Layout() {
         </Routes>
       </main>
 
-      {/* GLOBAL STYLES TO ENSURE MODALS WORK */}
       <style jsx global>{`
-        html, body, #root {
+        html,
+        body,
+        #root {
           height: 100%;
           margin: 0;
           padding: 0;
@@ -276,19 +322,14 @@ function Layout() {
           overflow: visible !important;
         }
 
-        /* Critical fix for modals */
         .modal-overlay {
           position: fixed !important;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
+          inset: 0;
           background: rgba(0, 0, 0, 0.6);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 9999 !important;
-          padding: 1rem;
         }
 
         .modal {
@@ -299,15 +340,13 @@ function Layout() {
           max-height: 90vh;
           overflow-y: auto;
           box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-          position: relative;
-          z-index: 10000 !important;
         }
       `}</style>
     </>
   );
 }
 
-/* ---------------- APP ROOT ---------------- */
+/* ================= ROOT ================= */
 export default function App() {
   return (
     <Router>
