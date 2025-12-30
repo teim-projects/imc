@@ -732,89 +732,127 @@ class SoundSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------
 # Singer Master (Service)
 # ---------------------------------------------------------------------
-
-
-# api/serializers.py
-# api/serializers.py
 from rest_framework import serializers
-from .models import Singer   # ← Import the actual model
+from .models import Singer
 
 
 class SingerSerializer(serializers.ModelSerializer):
-    mobile_number = serializers.CharField(source="mobile", required=False, allow_blank=True)
-    is_active = serializers.BooleanField(source="active", required=False)
-    photo_url = serializers.SerializerMethodField()
-
     class Meta:
-        model = Singer   # ← Use the imported model, NOT string!
-        fields = [
-            "id", "name", "birth_date", "mobile", "mobile_number",
-            "profession", "education", "achievement", "favourite_singer",
-            "reference_by", "genre", "experience", "area", "city", "state",
-            "rate", "gender", "active", "is_active", "photo", "photo_url",
-            "created_at", "updated_at"
-        ]
-        read_only_fields = ("id", "created_at", "updated_at", "photo_url")
-        extra_kwargs = {
-            "photo": {"required": False, "allow_null": True},
-        }
+        model = Singer
+        fields = "__all__"
 
-    def get_photo_url(self, obj):
-        if not obj.photo:
-            return None
-        request = self.context.get("request")
-        if request:
-            return request.build_absolute_uri(obj.photo.url)
-        return obj.photo.url
-    
+    def to_internal_value(self, data):
+        data = data.copy()
+
+        # Remove frontend-only field
+        data.pop("agreed_terms", None)
+
+        # Normalize gender
+        if "gender" in data and isinstance(data["gender"], str):
+            data["gender"] = data["gender"].lower()
+
+        # Convert empty strings to None
+        for field in ["experience", "rate", "birth_date"]:
+            if field in data and data[field] == "":
+                data[field] = None
+
+        return super().to_internal_value(data)
+
 
 
 # ---------------------------------------------------------------------
 # Singing class  (Service)
 # ---------------------------------------------------------------------
 # api/serializers.py
-import re
 from rest_framework import serializers
 from .models import SingingClass
 
 
 class SingingClassSerializer(serializers.ModelSerializer):
-    """
-    Serializer for SingingClass.
-    Exposes: day, time_slot, preferred_batch, fee, etc.
-    """
-
     class Meta:
         model = SingingClass
         fields = "__all__"
-        read_only_fields = ("date", "created_at")
 
-    def validate_phone(self, value):
-        if not value:
-            raise serializers.ValidationError("Phone is required.")
-        # very loose validation: digits, +, space, dash
-        if not re.match(r"^[0-9+\-\s]{8,20}$", value):
-            raise serializers.ValidationError("Enter a valid phone number.")
-        return value
 
-    def validate_fee(self, value):
-        if value is None or value < 0:
-            raise serializers.ValidationError("Fee must be ≥ 0.")
-        return value
 
-    def validate(self, attrs):
-        # Ensure day + time_slot present
-        day = attrs.get("day") or getattr(self.instance, "day", None)
-        slot = attrs.get("time_slot") or getattr(self.instance, "time_slot", None)
-        if not day:
-            raise serializers.ValidationError({"day": "Day is required."})
-        if not slot:
-            raise serializers.ValidationError({"time_slot": "Time slot is required."})
 
-        # Ensure terms accepted on create
-        agreed = attrs.get("agreed_terms")
-        if self.instance is None and not agreed:
+
+
+from rest_framework import serializers
+from .models import Trainer
+
+class TrainerSerializer(serializers.ModelSerializer):
+    batch_schedule = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Trainer
+        fields = "__all__"
+
+    def get_batch_schedule(self, obj):
+        return f"{obj.batch_day} {obj.batch_start_time} - {obj.batch_end_time}"
+
+    def validate(self, data):
+        if data["batch_end_time"] <= data["batch_start_time"]:
             raise serializers.ValidationError(
-                {"agreed_terms": "You must accept terms & conditions."}
+                "Batch end time must be after start time."
             )
-        return attrs
+        return data
+    
+
+
+
+
+
+from rest_framework import serializers
+from .models import Teacher, Class, Batch
+
+
+class TeacherSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Teacher
+        fields = ["id", "name", "phone", "email"]
+
+
+class ClassSerializer(serializers.ModelSerializer):
+    trainer_name = serializers.CharField(source="trainer.name", read_only=True)
+
+    class Meta:
+        model = Class
+        fields = [
+            "id",
+            "name",
+            "description",
+            "fee",
+            "trainer",
+            "trainer_name",
+        ]
+
+
+from rest_framework import serializers
+from .models import Batch
+
+class BatchSerializer(serializers.ModelSerializer):
+    class_name = serializers.CharField(source="class_obj.name", read_only=True)
+    class_fee = serializers.DecimalField(
+        source="class_obj.fee",
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+    trainer_name = serializers.CharField(source="trainer.name", read_only=True)
+
+    class Meta:
+        model = Batch
+        fields = [
+            "id",
+            "class_obj",
+            "class_name",
+            "class_fee",
+            "trainer",
+            "trainer_name",
+            "day",
+            "time_slot",
+            "capacity",
+            "created_at",
+        ]
+

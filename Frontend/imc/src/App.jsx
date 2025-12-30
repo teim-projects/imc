@@ -4,48 +4,71 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  useLocation,
   Navigate,
+  useLocation,
 } from "react-router-dom";
 
+/* ================= COMMON ================= */
 import Navbar from "./components/Navbar";
 import Login from "./components/Login";
-import Dashboard from "./components/Dashboard";
 import Register from "./components/Register";
+import Dashboard from "./components/Dashboard";
 import ProfileSection from "./components/ProfileSection";
 import ForgotPassword from "./components/ForgotPassword";
 import ResetPasswordConfirm from "./components/ResetPasswordConfirm";
 import HeroCarousel from "./components/HeroCarousel";
 
-// User Dashboard (main)
+/* ================= USER DASHBOARD ================= */
 import UserDashboard from "./userDashboard/UserDashboard";
 
-// Studio user homepage (list + nice UI)
-import StudioHomePage from "./userDashboard/studio/HomePage";
+/* ================= PAGES ================= */
+import Services from "./userDashboard/pages/Services";
+import Events from "./userDashboard/pages/Events";
+import Contact from "./userDashboard/pages/Contact";
+import SingingClass from "./userDashboard/pages/SingingClass";
+import SingerRegistration from "./userDashboard/pages/SingerRegistration";
 
-// Real forms
+/* ================= NEW: MY BOOKINGS & SOUND BOOKING PAGES ================= */
+import MyBookings from "./userDashboard/pages/MyBookings";
+import SoundBooking from "./userDashboard/pages/SoundBooking";   // ← ADDED: Sound Booking page
+
+/* ================= SERVICE HOME PAGES ================= */
+import StudioHomePage from "./userDashboard/studio/HomePage";
+import EventHomePage from "./userDashboard/Events/HomePage";
+import SingerHomePage from "./userDashboard/singer/HomePage";
+
+/* ================= EXTRA SERVICE PAGES ================= */
+import PrivateBooking from "./userDashboard/pages/PrivateBooking";
+import PhotographyBooking from "./userDashboard/pages/PhotographyBooking";
+import VideographyPage from "./userDashboard/pages/VideographyPage";
+
+/* ================= FORMS ================= */
+import SingerForm from "./components/Forms/SingerForm";
 import UserStudioRentalForm from "./userDashboard/Forms/UserStudioRentalForm";
 import UserPhotographyBookingForm from "./userDashboard/Forms/UserPhotographyBookingForm";
-import UserEvents from "./userDashboard/Forms/UserEvents"; // events page
+import UserEventBookingForm from "./userDashboard/Forms/UserEvents";
 
+/* ================= PAYMENT ================= */
+import PaymentPage from "./userDashboard/payment/PaymentPage";
+
+/* ================= ASSETS ================= */
 import "./App.css";
 import Img1 from "./assets/banner.jpg";
 import Img2 from "./assets/banner1.JPG";
 
-/* ----------------- Auth helpers ----------------- */
+/* ================= AUTH HELPERS ================= */
 const getUserInfo = () => {
   const token = localStorage.getItem("access");
-  const rawUser = localStorage.getItem("user");
   let user = null;
   try {
-    user = rawUser ? JSON.parse(rawUser) : null;
+    user = JSON.parse(localStorage.getItem("user"));
   } catch {
     user = null;
   }
   return { token, user };
 };
 
-/* ----------------- Route guards ----------------- */
+/* ================= ROUTE GUARDS ================= */
 function PrivateRoute({ children }) {
   const { token } = getUserInfo();
   if (!token) return <Navigate to="/login" replace />;
@@ -57,14 +80,12 @@ function AdminRoute({ children }) {
   if (!token) return <Navigate to="/login" replace />;
 
   const role = (user?.role || "").toLowerCase();
-  const isSuper = !!user?.is_superuser;
-
-  if (role === "admin" || isSuper) return children;
+  if (role === "admin" || user?.is_superuser) return children;
 
   return <Navigate to="/user-dashboard" replace />;
 }
 
-/* ----------------- Home Hero ----------------- */
+/* ================= HERO ================= */
 function HomeHero() {
   const slides = [
     {
@@ -82,13 +103,13 @@ function HomeHero() {
   return (
     <HeroCarousel
       images={slides}
-      interval={2000}
+      interval={2500}
       height="calc(100vh - 70px)"
     />
   );
 }
 
-/* ----------------- Layout ----------------- */
+/* ================= LAYOUT ================= */
 function Layout() {
   const location = useLocation();
   const showHero = location.pathname === "/";
@@ -100,10 +121,11 @@ function Layout() {
 
       <main className="app-main">
         <Routes>
-          {/* Home (just hero) */}
+
+          {/* HOME */}
           <Route path="/" element={<div />} />
 
-          {/* Auth */}
+          {/* AUTH */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -112,7 +134,7 @@ function Layout() {
             element={<ResetPasswordConfirm />}
           />
 
-          {/* Admin Dashboard */}
+          {/* ADMIN */}
           <Route
             path="/dashboard"
             element={
@@ -122,7 +144,16 @@ function Layout() {
             }
           />
 
-          {/* User Dashboard */}
+          <Route
+            path="/admin/singers"
+            element={
+              <AdminRoute>
+                <SingerForm initialMode="list" />
+              </AdminRoute>
+            }
+          />
+
+          {/* USER */}
           <Route
             path="/user-dashboard"
             element={
@@ -132,7 +163,6 @@ function Layout() {
             }
           />
 
-          {/* Profile */}
           <Route
             path="/profile"
             element={
@@ -142,9 +172,38 @@ function Layout() {
             }
           />
 
-          {/* ----------------- Services ----------------- */}
+          {/* MY BOOKINGS */}
+          <Route
+            path="/my-bookings"
+            element={
+              <PrivateRoute>
+                <MyBookings />
+              </PrivateRoute>
+            }
+          />
 
-          {/* Studio Booking – now opens Studio HomePage */}
+          {/* PUBLIC */}
+          <Route path="/services" element={<Services />} />
+          <Route path="/events" element={<Events />} />
+          <Route path="/contact" element={<Contact />} />
+
+          {/* CLASSES */}
+          <Route path="/classes" element={<SingingClass />} />
+          <Route path="/singing-classes" element={<Navigate to="/classes" replace />} />
+
+          {/* SINGER REGISTRATION */}
+          <Route path="/singer" element={<SingerRegistration />} />
+
+          {/* STUDIO */}
+          <Route
+            path="/studio"
+            element={
+              <PrivateRoute>
+                <StudioHomePage />
+              </PrivateRoute>
+            }
+          />
+
           <Route
             path="/studio-booking"
             element={
@@ -154,7 +213,6 @@ function Layout() {
             }
           />
 
-          {/* (optional) direct form route if you still want it */}
           <Route
             path="/studio-booking/form"
             element={
@@ -164,55 +222,131 @@ function Layout() {
             }
           />
 
-          {/* Photography Booking */}
-          <Route
-            path="/photography-booking"
-            element={
-              <PrivateRoute>
-                <UserPhotographyBookingForm />
-              </PrivateRoute>
-            }
-          />
-
-          {/* Events & Shows */}
+          {/* EVENTS */}
           <Route
             path="/events-booking"
             element={
               <PrivateRoute>
-                <UserEvents />
+                <EventHomePage />
               </PrivateRoute>
             }
           />
 
-          {/* Videography placeholder */}
           <Route
-            path="/videography-booking"
+            path="/events-booking/form"
             element={
               <PrivateRoute>
-                <div style={{ padding: "2rem" }}>Videography Booking (TODO)</div>
+                <UserEventBookingForm />
               </PrivateRoute>
             }
           />
 
-          {/* Sound placeholder */}
+          {/* PHOTOGRAPHY */}
+          <Route
+            path="/photography-booking"
+            element={
+              <PrivateRoute>
+                <PhotographyBooking />
+              </PrivateRoute>
+            }
+          />
+
+          {/* VIDEOGRAPHY */}
+          <Route
+            path="/videography"
+            element={
+              <PrivateRoute>
+                <VideographyPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* PRIVATE BOOKING */}
+          <Route
+            path="/private-booking"
+            element={
+              <PrivateRoute>
+                <PrivateBooking />
+              </PrivateRoute>
+            }
+          />
+
+          {/* SINGER BOOKING */}
+          <Route
+            path="/singer-booking"
+            element={
+              <PrivateRoute>
+                <SingerHomePage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* NEW: SOUND SYSTEM BOOKING */}
           <Route
             path="/sound-booking"
             element={
               <PrivateRoute>
-                <div style={{ padding: "2rem" }}>Sound Booking (TODO)</div>
+                <SoundBooking />
               </PrivateRoute>
             }
           />
 
-          {/* fallback */}
+          {/* PAYMENT */}
+          <Route
+            path="/payment"
+            element={
+              <PrivateRoute>
+                <PaymentPage />
+              </PrivateRoute>
+            }
+          />
+
+          {/* FALLBACK */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+
+      <style jsx global>{`
+        html,
+        body,
+        #root {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+        }
+
+        .app-main {
+          min-height: calc(100vh - 70px);
+          position: relative;
+          overflow: visible !important;
+        }
+
+        .modal-overlay {
+          position: fixed !important;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999 !important;
+        }
+
+        .modal {
+          background: white;
+          border-radius: 16px;
+          width: 100%;
+          max-width: 900px;
+          max-height: 90vh;
+          overflow-y: auto;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+      `}</style>
     </>
   );
 }
 
-/* ----------------- App Root ----------------- */
+/* ================= ROOT ================= */
 export default function App() {
   return (
     <Router>

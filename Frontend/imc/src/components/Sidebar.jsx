@@ -116,11 +116,11 @@ function Sidebar({ openModal, openSubModal, currentKey = null }) {
       },
 
       {
-        name: "Payments",
-        key: "payment",
+        name: "Triner",
+        key: "Triner",
         icon: <FaMoneyBill />,
         modal: null,
-        subActionKey: "addPayment",
+        subActionKey: "addTrainer",
       },
 
       {

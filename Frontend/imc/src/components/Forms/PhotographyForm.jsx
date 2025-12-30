@@ -556,89 +556,108 @@ const PhotographyForm = ({ onClose, viewOnly = false }) => {
       )}
 
       {/* VIEW TABLE */}
-      {tab === "VIEW" && (
-        <div className="pf-table-card">
-          <div className="pf-table-top">
-            <input
-              className="pf-search"
-              placeholder="Search client, phone, email, event, location, package..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <button className="btn" onClick={fetchRows} disabled={loading}>
-              {loading ? "Loading..." : "Refresh"}
-            </button>
-          </div>
+{tab === "VIEW" && (
+  <div className="pf-table-card">
+    <div className="pf-table-top">
+      <input
+        className="pf-search"
+        placeholder="Search client, contact_number, email, event, location, package..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <button className="btn" onClick={fetchRows} disabled={loading}>
+        {loading ? "Loading..." : "Refresh"}
+      </button>
+    </div>
 
-          <div className="pf-table-wrap">
-            <table className="pf-table">
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Event</th>
-                  <th>Date</th>
-                  <th>Location</th>
-                  <th>Package Price</th>
-                  <th>Add-on</th>
-                  <th>Payment</th>
-                  <th className="c">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.client || r.client_name}</td>
-                    <td>{displayEvent(r)}</td>
-                    <td>{r.date || r.shoot_date}</td>
-                    <td>{r.location}</td>
-                    <td>{r.package_price ? `₹${r.package_price}` : ""}</td>
-                    <td>{displayAddon(r)}</td>
-                    <td>{(r.payment_methods || r.payment_method || "").toString()}</td>
-                    <td className="c">
-                      <button className="mini" onClick={() => onEdit(r)}>
-                        Edit
-                      </button>
-                      <button
-                        className="mini danger"
-                        onClick={() => onDelete(r)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!pageRows.length && (
-                  <tr>
-                    <td colSpan="8" className="c muted">
-                      {loading ? "Loading..." : "No records found."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+    <div className="pf-table-wrap">
+      <table className="pf-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Event</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Package</th>
+            <th>Budget</th>
+            <th>Payment</th>
+            <th className="c">Actions</th>
+          </tr>
+        </thead>
 
-          <div className="pf-pager">
-            <button
-              className="mini"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Prev
-            </button>
-            <span>
-              Page {page} / {totalPages}
-            </span>
-            <button
-              className="mini"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        <tbody>
+          {pageRows.map((r) => (
+            <tr key={r.id}>
+              <td>{r.client}</td>
+              <td>{displayEvent(r)}</td>
+              <td>{r.date}</td>
+              <td>{r.location}</td>
+
+              {/* PACKAGE */}
+              <td>{r.package_type || "-"}</td>
+
+              {/* BUDGET (from package_price) */}
+              <td>
+                {r.package_price
+                  ? `₹${Number(r.package_price).toLocaleString()}`
+                  : "-"}
+              </td>
+
+              {/* PAYMENT (from payment_methods_list) */}
+              <td>
+                {Array.isArray(r.payment_methods_list) &&
+                r.payment_methods_list.length > 0
+                  ? r.payment_methods_list.join(", ")
+                  : "-"}
+              </td>
+
+              <td className="c">
+                <button className="mini" onClick={() => onEdit(r)}>
+                  Edit
+                </button>
+                <button
+                  className="mini danger"
+                  onClick={() => onDelete(r)}
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+
+          {!pageRows.length && (
+            <tr>
+              <td colSpan="8" className="c muted">
+                {loading ? "Loading..." : "No records found."}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="pf-pager">
+      <button
+        className="mini"
+        disabled={page <= 1}
+        onClick={() => setPage((p) => Math.max(1, p - 1))}
+      >
+        Prev
+      </button>
+      <span>
+        Page {page} / {totalPages}
+      </span>
+      <button
+        className="mini"
+        disabled={page >= totalPages}
+        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

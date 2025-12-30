@@ -24,6 +24,11 @@ from .views import (
 
     StudioMasterViewSet, StudioImageUploadView, SingerViewSet, SingingClassAdmissionViewSet,
 )
+from .views import TrainerViewSet
+from .views import BatchViewSet
+from .views import TeacherViewSet
+from .views import ClassViewSet
+
 
 router = DefaultRouter()
 
@@ -66,7 +71,17 @@ router.register(r"auth/sound", SoundViewSet, basename="auth-sound")  # alias
 router.register(r"singers", SingerViewSet, basename="singer")
 
 
+
 router.register(r"singing-classes", SingingClassAdmissionViewSet, basename="singingclass")
+
+
+router.register("teachers", TeacherViewSet)
+router.register("batches", BatchViewSet, basename="batches")
+router.register("classes", ClassViewSet)
+
+
+
+router.register(r"trainers", TrainerViewSet, basename="trainers")
 
 
 urlpatterns = [

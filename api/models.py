@@ -346,9 +346,9 @@ class PrivateBooking(models.Model):
 # ============================================================
 # ===================== PHOTOGRAPHY (OLD NAMES) ==============
 # ============================================================
-
 from django.db import models
 from django.conf import settings
+
 
 class PhotographyBooking(models.Model):
     client = models.CharField(max_length=200)
@@ -381,17 +381,21 @@ class PhotographyBooking(models.Model):
     notes = models.TextField(blank=True, null=True)
 
     # Payment
-    payment_methods_list = models.JSONField(default=list)   # ["Cash"]
+    payment_methods_list = models.JSONField(default=list)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="photo_bookings"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="photo_bookings"
     )
 
     def __str__(self):
         return f"{self.client} – {self.event_type}"
+
 
 
 # ============================================================
@@ -783,68 +787,43 @@ SoundSetup = Sound
 
 
 
+
 # ===============================================
 # ============  Singer (SERVICE)  =========
 # ===============================================
-
-# api/models.py
 import os
 import uuid
-from django.db import models
-from django.utils.deconstruct import deconstructible
+import re
+from datetime import date
+from django.db import models, transaction
+from django.db.models import Q
 
-def singer_upload_to(instance, filename):
-    """Primary upload function — places files under media/singers/<uuid>.<ext>."""
+
+# --------------------------------------------------
+# IMAGE UPLOAD HELPERS (DO NOT DELETE)
+# --------------------------------------------------
+def singer_photo_upload_to(instance, filename):
     ext = filename.split('.')[-1] if '.' in filename else 'jpg'
     filename = f"{uuid.uuid4().hex}.{ext}"
     return os.path.join("singers", filename)
 
-# keep backward-compatible name used by older migrations
-def singer_photo_upload_to(instance, filename):
-    return singer_upload_to(instance, filename)
+
+def singer_upload_to(instance, filename):
+    return singer_photo_upload_to(instance, filename)
 
 
+# --------------------------------------------------
+# SINGER MODEL
+# --------------------------------------------------
 class Singer(models.Model):
-    GENDER_CHOICES = (
-        ('male', 'Male'),
-        ('female', 'Female'),
-        ('other', 'Other'),
+
+    # ✅ STRING PRIMARY KEY
+    id = models.CharField(
+        max_length=20,
+        primary_key=True,
+        editable=False
     )
 
-    name = models.CharField(max_length=255)
-    genre = models.CharField(max_length=120, blank=True, null=True)
-    experience = models.PositiveIntegerField(default=0)
-    area = models.CharField(max_length=255, blank=True, null=True)
-    city = models.CharField(max_length=120, blank=True, null=True)
-    state = models.CharField(max_length=120, blank=True, null=True)
-    rate = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
-    mobile = models.CharField(max_length=32, blank=True, null=True)
-    active = models.BooleanField(default=True)
-    photo = models.ImageField(upload_to=singer_photo_upload_to, blank=True, null=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ('-id',)
-        verbose_name = "Singer"
-        verbose_name_plural = "Singers"
-
-    def __str__(self):
-        return self.name or f"Singer {self.pk}"
-
-
-
-
-
-
-# # api/models.py
-# api/models.py
-from django.db import models
-
-
-class Singer(models.Model):
     name = models.CharField(max_length=255)
     birth_date = models.DateField(null=True, blank=True)
     mobile = models.CharField(max_length=20, blank=True, default="")
@@ -855,31 +834,66 @@ class Singer(models.Model):
     reference_by = models.CharField(max_length=200, blank=True, default="")
     genre = models.CharField(max_length=100, blank=True, default="")
     experience = models.PositiveIntegerField(null=True, blank=True)
-    
+
     area = models.CharField(max_length=200, blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
     state = models.CharField(max_length=100, blank=True, default="")
-    
+
     rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
     gender = models.CharField(
         max_length=10,
         choices=[('male', 'Male'), ('female', 'Female'), ('other', 'Other')],
         blank=True,
         default=""
     )
-    active = models.BooleanField(default=True)
-    photo = models.ImageField(upload_to='singers/', null=True, blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True)
+    photo = models.ImageField(upload_to=singer_photo_upload_to, null=True, blank=True)
+
+    # ✅ DATE ONLY (AUTO HANDLED)
+    created_at = models.DateField(editable=False)
+    updated_at = models.DateField(editable=False)
 
     class Meta:
         ordering = ['-created_at']
+        verbose_name = "Singer"
         verbose_name_plural = "Singers"
 
+    # --------------------------------------------------
+    # SAFE AUTO-ID + DATE LOGIC (NO DUPLICATES EVER)
+    # --------------------------------------------------
+    def save(self, *args, **kwargs):
+
+        # 🔐 AUTO ID ONLY FOR NEW RECORD
+        if not self.id:
+            with transaction.atomic():
+                ids = (
+                    Singer.objects
+                    .select_for_update()
+                    .filter(id__startswith="IMC/SM-")
+                    .exclude(Q(id="") | Q(id__isnull=True))
+                    .values_list("id", flat=True)
+                )
+
+                max_num = 0
+                for i in ids:
+                    match = re.search(r"IMC/SM-(\d+)$", i)
+                    if match:
+                        max_num = max(max_num, int(match.group(1)))
+
+                self.id = f"IMC/SM-{max_num + 1:03d}"
+
+        # 📅 DATE ONLY AUTO
+        if not self.created_at:
+            self.created_at = date.today()
+
+        self.updated_at = date.today()
+
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return self.name
-    
+        return f"{self.id} - {self.name}"
 
 # ===============================================
 # ============  Singing (SERVICE)  =========
@@ -900,21 +914,17 @@ class SingingClass(models.Model):
         CONFIRMED = "confirmed", "Confirmed"
         CANCELLED = "cancelled", "Cancelled"
 
-    # NEW: keep a fixed set of days
-    class DayChoices(models.TextChoices):
-        MONDAY = "Monday", "Monday"
-        TUESDAY = "Tuesday", "Tuesday"
-        WEDNESDAY = "Wednesday", "Wednesday"
-        THURSDAY = "Thursday", "Thursday"
-        FRIDAY = "Friday", "Friday"
-        SATURDAY = "Saturday", "Saturday"
-        SUNDAY = "Sunday", "Sunday"
+    # 🔥 IMPORTANT FIX
+    batch = models.ForeignKey(
+        "Batch",
+        on_delete=models.CASCADE,
+        related_name="admissions"
+    )
 
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20)
 
-    # 👉 EMAIL OPTIONAL
     email = models.EmailField(blank=True, null=True)
 
     address1 = models.CharField(max_length=255, blank=True)
@@ -923,31 +933,10 @@ class SingingClass(models.Model):
     state = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
 
-    # NEW: separate day + time slot fields
-    day = models.CharField(
-        max_length=16,
-        choices=DayChoices.choices,
-        help_text="Day of class (Monday–Sunday).",
-    )
-    time_slot = models.CharField(
-        max_length=50,
-        help_text="Time slot like '07:00 - 08:00'.",
-    )
-
-    # Kept for compatibility / display, auto-filled from day + time_slot
-    preferred_batch = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="Auto: 'Day - TimeSlot', e.g., 'Monday - 07:00 - 08:00'.",
-    )
-
-    reference_by = models.CharField(max_length=100, blank=True)
-
     fee = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        validators=[MinValueValidator(0)],
-        help_text="Admission fee in INR",
+        validators=[MinValueValidator(0)]
     )
 
     payment_method = models.CharField(
@@ -963,29 +952,86 @@ class SingingClass(models.Model):
         default=Status.PENDING,
     )
 
-    date = models.DateField(auto_now_add=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        ordering = ("-created_at",)
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} - {self.batch}"
+
+
+
+
+
+# api/models.py
+from django.db import models
+
+class Trainer(models.Model):
+    trainer_name = models.CharField(max_length=255)
+    mobile = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    batch_day = models.CharField(max_length=20)
+    batch_start_time = models.TimeField()
+    batch_end_time = models.TimeField()
+    fee = models.DecimalField(max_digits=8, decimal_places=2)
+    notes = models.TextField(blank=True)
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.preferred_batch or self.day})"
-
-    def save(self, *args, **kwargs):
-        """
-        Always keep preferred_batch in sync with day + time_slot.
-        This way older UI / filters using preferred_batch still work.
-        """
-        if self.day and self.time_slot:
-            self.preferred_batch = f"{self.day} - {self.time_slot}"
-        super().save(*args, **kwargs)
+        return self.trainer_name
 
 
 
 
 
+# app/models.py
+class Teacher(models.Model):
+    name = models.CharField(max_length=150)
+    phone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+
+    def __str__(self):
+        return self.name
 
 
+class Class(models.Model):
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True)
+    fee = models.DecimalField(max_digits=10, decimal_places=2)
+    trainer = models.ForeignKey(
+        Teacher,
+        on_delete=models.CASCADE,
+        related_name="classes"
+    )
+
+    def __str__(self):
+        return self.name
 
 
+class Batch(models.Model):
+    DAY_CHOICES = [
+        ("Monday", "Monday"),
+        ("Tuesday", "Tuesday"),
+        ("Wednesday", "Wednesday"),
+        ("Thursday", "Thursday"),
+        ("Friday", "Friday"),
+        ("Saturday", "Saturday"),
+        ("Sunday", "Sunday"),
+    ]
+
+    class_obj = models.ForeignKey(
+        Class,
+        on_delete=models.CASCADE,
+        related_name="batches"
+    )
+
+    trainer = models.ForeignKey(
+        Teacher,
+        on_delete=models.CASCADE,
+        related_name="batches"
+    )
+
+    day = models.CharField(max_length=20, choices=DAY_CHOICES)
+    time_slot = models.CharField(max_length=50)
+    capacity = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.class_obj.name} - {self.day} {self.time_slot}"

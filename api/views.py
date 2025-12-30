@@ -601,17 +601,38 @@ class SoundViewSet(viewsets.ModelViewSet):
 # ====================================================================
 # Singer Master (Service)
 # ====================================================================
-
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.response import Response
 from .models import Singer
 from .serializers import SingerSerializer
-from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+
+class SingerPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.method in ["GET", "POST"]:
+            return True
+        return request.user and request.user.is_staff
+
 
 class SingerViewSet(viewsets.ModelViewSet):
-    queryset = Singer.objects.all()
+    queryset = Singer.objects.all().order_by("-created_at")
     serializer_class = SingerSerializer
-    permission_classes = [permissions.IsAuthenticated]  # adjust as needed
+    permission_classes = [SingerPermission]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["id", "name", "city", "genre", "mobile"]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+            print("❌ SERIALIZER ERRORS:", serializer.errors)
+            return Response(serializer.errors, status=400)
+
+        self.perform_create(serializer)
+        return Response(serializer.data, status=201)
+
 
 
 
@@ -801,7 +822,6 @@ class DashboardSummary(APIView):
 
 # api/views.py
 from django.shortcuts import get_object_or_404
-
 from rest_framework import viewsets, permissions, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -811,24 +831,7 @@ from .models import SingingClass
 from .serializers import SingingClassSerializer
 
 
-class IsAdminOrReadOnly(permissions.BasePermission):
-    """
-    Allow safe methods (GET/HEAD/OPTIONS) to anyone,
-    but write/update/delete only to staff/superuser.
-    """
-
-    def has_permission(self, request, view):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return bool(request.user and request.user.is_staff)
-
-
 class SingingClassPagination(PageNumberPagination):
-    """
-    Supports:
-      /auth/singing-classes/?page=1&page_size=10
-    which matches what your React list code expects.
-    """
     page_size = 10
     page_size_query_param = "page_size"
     max_page_size = 100
@@ -836,95 +839,81 @@ class SingingClassPagination(PageNumberPagination):
 
 class SingingClassAdmissionViewSet(viewsets.ModelViewSet):
     """
-    Standard CRUD for SingingClass.
-
-    list:     GET    /auth/singing-classes/
-    create:   POST   /auth/singing-classes/
-    retrieve: GET    /auth/singing-classes/<pk>/
-    update:   PUT    /auth/singing-classes/<pk>/
-    partial:  PATCH  /auth/singing-classes/<pk>/
-    destroy:  DELETE /auth/singing-classes/<pk>/
-
-    Extra:
-      PATCH /auth/singing-classes/<pk>/status/
-            body: { "status": "confirmed" }
-
-      GET   /auth/singing-classes/by-slot/?day=Monday&time_slot=07:00%20-%2008:00
+    Handles:
+    - Create admission
+    - List admissions
+    - Update / delete
+    - Filter by day & time
     """
 
-    queryset = SingingClass.objects.all().order_by("-created_at")
+    queryset = SingingClass.objects.select_related(
+        "batch",
+        "batch__class_obj",
+        "batch__trainer"
+    ).order_by("-created_at")
+
     serializer_class = SingingClassSerializer
 
-    # If you want public creation/use -> AllowAny
-    # If you want only logged-in -> IsAuthenticated
+    # ✅ IMPORTANT FIX (prevents 401 Unauthorized)
+    authentication_classes = []   # <-- REQUIRED
     permission_classes = [permissions.AllowAny]
 
     pagination_class = SingingClassPagination
 
-    # Search + ordering (optional but useful for table)
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+
     search_fields = [
         "first_name",
         "last_name",
         "phone",
         "email",
-        "city",
         "preferred_batch",
         "day",
         "time_slot",
-        "status",
     ]
+
     ordering_fields = ["date", "created_at", "fee"]
     ordering = ["-created_at"]
 
-    # Example extra action to update status (only for staff)
-    @action(
-        detail=True,
-        methods=["patch"],
-        permission_classes=[permissions.IsAdminUser],
-    )
+    def perform_create(self, serializer):
+        """
+        Create admission.
+        preferred_batch auto-filled in model save()
+        """
+        serializer.save()
+
+    # ---------------------------------------------------
+    # UPDATE STATUS (admin usage)
+    # ---------------------------------------------------
+    @action(detail=True, methods=["patch"])
     def status(self, request, pk=None):
-        """
-        PATCH /auth/singing-classes/<pk>/status/
-        payload: { "status": "confirmed" }
+        obj = self.get_object()
+        status_value = request.data.get("status")
 
-        Allowed statuses: pending, confirmed, cancelled
-        """
-        sc = get_object_or_404(SingingClass, pk=pk)
-        new_status = request.data.get("status")
-
-        if not new_status:
+        if status_value not in ["pending", "confirmed", "cancelled"]:
             return Response(
-                {"detail": "Missing 'status' field."},
+                {"detail": "Invalid status"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        allowed = {"pending", "confirmed", "cancelled"}
-        if new_status not in allowed:
-            return Response(
-                {"detail": f"Invalid status. Allowed: {', '.join(allowed)}"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        obj.status = status_value
+        obj.save(update_fields=["status"])
 
-        sc.status = new_status
-        sc.save(update_fields=["status"])
         return Response(
-            {"id": sc.id, "status": sc.status},
-            status=status.HTTP_200_OK,
+            {"id": obj.id, "status": obj.status},
+            status=status.HTTP_200_OK
         )
 
+    # ---------------------------------------------------
+    # FILTER BY DAY / TIME SLOT
+    # ---------------------------------------------------
     @action(detail=False, methods=["get"], url_path="by-slot")
     def by_slot(self, request):
-        """
-        GET /auth/singing-classes/by-slot/?day=Monday&time_slot=07:00%20-%2008:00
-
-        Filters admissions by day and/or time_slot.
-        Both parameters are optional; if none passed, returns all.
-        """
         day = request.query_params.get("day")
         slot = request.query_params.get("time_slot")
 
         qs = self.get_queryset()
+
         if day:
             qs = qs.filter(day=day)
         if slot:
@@ -935,14 +924,46 @@ class SingingClassAdmissionViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(qs, many=True)
-        return Response(serializer.data)
+        return Response(self.get_serializer(qs, many=True).data)
 
-    def perform_create(self, serializer):
-        """
-        Called on POST /auth/singing-classes/
 
-        fee + payment_method + day + time_slot are validated in SingingClassSerializer,
-        and the model's save() will auto-fill preferred_batch = "Day - Slot".
-        """
-        serializer.save()
+
+
+
+# api/views.py
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAuthenticated
+from .models import Trainer
+from .serializers import TrainerSerializer
+
+
+class TrainerViewSet(ModelViewSet):
+    queryset = Trainer.objects.all()
+    serializer_class = TrainerSerializer
+    permission_classes = [IsAuthenticated]
+
+
+
+
+
+
+
+from rest_framework.viewsets import ModelViewSet
+from .models import Teacher, Class, Batch
+from .serializers import TeacherSerializer, ClassSerializer, BatchSerializer
+from .serializers import BatchSerializer
+
+
+class TeacherViewSet(ModelViewSet):
+    queryset = Teacher.objects.all()
+    serializer_class = TeacherSerializer
+
+
+class ClassViewSet(ModelViewSet):
+    queryset = Class.objects.select_related("trainer")
+    serializer_class = ClassSerializer
+
+
+class BatchViewSet(ModelViewSet):
+    queryset = Batch.objects.select_related('class_obj', 'trainer').all()
+    serializer_class = BatchSerializer  # ← ABSOLUTELY REQUIRED

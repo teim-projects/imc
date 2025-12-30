@@ -18,15 +18,15 @@ const PAGE_SIZE = 10;
 
 // Form state (aligned with backend model)
 const initialForm = {
-  full_name: "",
+  client: "",
   email: "",
-  phone: "",
+  contact_number: "",
   event_type: "Wedding",
   event_type_other: "",
-  event_date: "",
+  date: "",
   start_time: "",
   duration_hours: 2,
-  location_venue: "",
+  location: "",
   city: "",
   package_type: "Standard",
   num_photographers: 1,
@@ -118,11 +118,11 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
   };
 
   const validate = () => {
-    if (!form.full_name?.trim()) return "Client name is required.";
-    if (!form.phone?.trim()) return "Mobile number is required.";
-    if (!form.event_date) return "Event date is required.";
+    if (!form.client?.trim()) return "Client name is required.";
+    if (!form.contact_number?.trim()) return "Mobile number is required.";
+    if (!form.date) return "Event date is required.";
     if (!form.start_time) return "Start time is required.";
-    if (!form.location_venue?.trim()) return "Location is required.";
+    if (!form.location?.trim()) return "Location is required.";
     if (!form.payment_method) return "Select a payment method.";
 
     if (form.event_type === "Other" && !form.event_type_other.trim()) {
@@ -134,17 +134,17 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
   // Build payload matching PhotographyBooking model
   const buildPayload = () => {
     const payload = {
-      full_name: form.full_name,
+      client: form.client,
       email: form.email,
-      phone: form.phone,
+      contact_number: form.contact_number,
       event_type:
         form.event_type === "Other" && form.event_type_other
           ? form.event_type_other
           : form.event_type,
-      event_date: form.event_date,
+      date: form.date,
       start_time: form.start_time,
       duration_hours: form.duration_hours,
-      location_venue: form.location_venue,
+      location: form.location,
       city: form.city,
       package_type: form.package_type,
       num_photographers: form.num_photographers,
@@ -214,15 +214,15 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
 
     setForm({
       ...initialForm,
-      full_name: row.full_name || "",
+      client: row.client || "",
       email: row.email || "",
-      phone: row.phone || "",
+      contact_number: row.contact_number || "",
       event_type: row.event_type || "Wedding",
       event_type_other: "", // cannot know original "Other" vs predefined
-      event_date: row.event_date || "",
+      date: row.date || "",
       start_time: row.start_time || "",
       duration_hours: row.duration_hours ?? 2,
-      location_venue: row.location_venue || "",
+      location: row.location || "",
       city: row.city || "",
       package_type: row.package_type || "Standard",
       num_photographers: row.num_photographers ?? 1,
@@ -238,7 +238,7 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
   };
 
   const onDelete = async (row) => {
-    if (!confirm(`Delete booking for ${row.full_name}?`)) return;
+    if (!confirm(`Delete booking for ${row.client}?`)) return;
     try {
       await axios.delete(`${API_URL}${row.id}/`, { headers });
       setRows((s) => s.filter((r) => r.id !== row.id));
@@ -257,9 +257,9 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
     const q = search.toLowerCase().trim();
     if (!q) return rows;
     return rows.filter((r) => {
-      const hay = `${r.full_name || ""} ${r.phone || ""} ${r.email || ""} ${
+      const hay = `${r.client || ""} ${r.contact_number || ""} ${r.email || ""} ${
         r.event_type || ""
-      } ${r.location_venue || ""} ${r.city || ""} ${r.package_type || ""} ${
+      } ${r.location || ""} ${r.city || ""} ${r.package_type || ""} ${
         r.budget_range || ""
       } ${r.notes || ""}`
         .toLowerCase()
@@ -316,8 +316,8 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
               <label>
                 Client Name*
                 <input
-                  name="full_name"
-                  value={form.full_name}
+                  name="client"
+                  value={form.client}
                   onChange={onChange}
                   placeholder="Full name"
                   required
@@ -326,8 +326,8 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
               <label>
                 Mobile*
                 <input
-                  name="phone"
-                  value={form.phone}
+                  name="contact_number"
+                  value={form.contact_number}
                   onChange={onChange}
                   placeholder="98765 43210"
                   required
@@ -405,8 +405,8 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
                 Event Date*
                 <input
                   type="date"
-                  name="event_date"
-                  value={form.event_date}
+                  name="date"
+                  value={form.date}
                   onChange={onChange}
                   required
                 />
@@ -435,8 +435,8 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
               <label>
                 Location (Venue)*
                 <input
-                  name="location_venue"
-                  value={form.location_venue}
+                  name="location"
+                  value={form.location}
                   onChange={onChange}
                   placeholder="Venue / Address"
                   required
@@ -586,89 +586,108 @@ const UserPhotographyBookingForm = ({ onClose, viewOnly = false }) => {
       )}
 
       {/* VIEW TABLE */}
-      {tab === "VIEW" && (
-        <div className="pf-table-card">
-          <div className="pf-table-top">
-            <input
-              className="pf-search"
-              placeholder="Search client, phone, email, event, location, package..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <button className="btn" onClick={fetchRows} disabled={loading}>
-              {loading ? "Loading..." : "Refresh"}
-            </button>
-          </div>
+{tab === "VIEW" && (
+  <div className="pf-table-card">
+    <div className="pf-table-top">
+      <input
+        className="pf-search"
+        placeholder="Search client, contact_number, email, event, location, package..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      <button className="btn" onClick={fetchRows} disabled={loading}>
+        {loading ? "Loading..." : "Refresh"}
+      </button>
+    </div>
 
-          <div className="pf-table-wrap">
-            <table className="pf-table">
-              <thead>
-                <tr>
-                  <th>Client</th>
-                  <th>Event</th>
-                  <th>Date</th>
-                  <th>Location</th>
-                  <th>Package</th>
-                  <th>Budget</th>
-                  <th>Payment</th>
-                  <th className="c">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((r) => (
-                  <tr key={r.id}>
-                    <td>{r.full_name}</td>
-                    <td>{displayEvent(r)}</td>
-                    <td>{r.event_date}</td>
-                    <td>{r.location_venue}</td>
-                    <td>{r.package_type}</td>
-                    <td>{r.budget_range}</td>
-                    <td>{displayPayment(r)}</td>
-                    <td className="c">
-                      <button className="mini" onClick={() => onEdit(r)}>
-                        Edit
-                      </button>
-                      <button
-                        className="mini danger"
-                        onClick={() => onDelete(r)}
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!pageRows.length && (
-                  <tr>
-                    <td colSpan="8" className="c muted">
-                      {loading ? "Loading..." : "No records found."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+    <div className="pf-table-wrap">
+      <table className="pf-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Event</th>
+            <th>Date</th>
+            <th>Location</th>
+            <th>Package</th>
+            <th>Budget</th>
+            <th>Payment</th>
+            <th className="c">Actions</th>
+          </tr>
+        </thead>
 
-          <div className="pf-pager">
-            <button
-              className="mini"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Prev
-            </button>
-            <span>
-              Page {page} / {totalPages}
-            </span>
-            <button
-              className="mini"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+        <tbody>
+          {pageRows.map((r) => (
+            <tr key={r.id}>
+              <td>{r.client}</td>
+              <td>{displayEvent(r)}</td>
+              <td>{r.date}</td>
+              <td>{r.location}</td>
+
+              {/* PACKAGE */}
+              <td>{r.package_type || "-"}</td>
+
+              {/* BUDGET (from package_price) */}
+              <td>
+                {r.package_price
+                  ? `₹${Number(r.package_price).toLocaleString()}`
+                  : "-"}
+              </td>
+
+              {/* PAYMENT (from payment_methods_list) */}
+              <td>
+                {Array.isArray(r.payment_methods_list) &&
+                r.payment_methods_list.length > 0
+                  ? r.payment_methods_list.join(", ")
+                  : "-"}
+              </td>
+
+              <td className="c">
+                <button className="mini" onClick={() => onEdit(r)}>
+                  Edit
+                </button>
+                <button
+                  className="mini danger"
+                  onClick={() => onDelete(r)}
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          ))}
+
+          {!pageRows.length && (
+            <tr>
+              <td colSpan="8" className="c muted">
+                {loading ? "Loading..." : "No records found."}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    <div className="pf-pager">
+      <button
+        className="mini"
+        disabled={page <= 1}
+        onClick={() => setPage((p) => Math.max(1, p - 1))}
+      >
+        Prev
+      </button>
+      <span>
+        Page {page} / {totalPages}
+      </span>
+      <button
+        className="mini"
+        disabled={page >= totalPages}
+        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

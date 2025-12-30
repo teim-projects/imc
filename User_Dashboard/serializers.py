@@ -148,42 +148,22 @@ class UserStudioBookingSerializer(serializers.ModelSerializer):
             instance.payment_methods = payment_methods
             instance.save(update_fields=["payment_methods_csv"])
         return instance
-
-
 from rest_framework import serializers
-from api.models import PhotographyBooking   # use same table/model
+from api.models import PhotographyBooking
+
 
 class UserPhotographyBookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = PhotographyBooking
-        fields = [
-            "id",
-            "full_name",
-            "email",
-            "phone",
-            "event_type",
-            "event_date",
-            "start_time",
-            "duration_hours",
-            "location_venue",
-            "city",
-            "package_type",
-            "num_photographers",
-            "need_videography",
-            "need_album",
-            "need_drone",
-            "budget_range",
-            "notes",
-            "payment_method",
-            "created_at",
-            "updated_at",
-        ]
-        read_only_fields = ["id", "user", "created_at", "updated_at"]
+        fields = "__all__"
+        read_only_fields = ["id", "user", "created_at"]
 
     def create(self, validated_data):
-        user = self.context["request"].user
-        validated_data["user"] = user
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            validated_data["user"] = request.user
         return super().create(validated_data)
+
 
 
 
@@ -446,3 +426,82 @@ class UserEventBookingSerializer(serializers.ModelSerializer):
             validated_data["status"] = "confirmed"
 
         return super().create(validated_data)
+
+
+
+
+
+# User_Dashboard/serializers.py
+from rest_framework import serializers
+from api.models import Event, EventBooking, Singer
+
+# ... your other serializers (EventListSerializer, UserEventBookingSerializer, etc.) ...
+
+
+class SingerListSerializer(serializers.ModelSerializer):
+    """
+    Serializer for singer listing on frontend.
+    """
+    display_name = serializers.SerializerMethodField()
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Singer
+        fields = [
+            "id",
+            "display_name",
+            "name",
+            "genre",
+            "city",
+            "state",
+            "area",
+            "experience",
+            "rate",
+            "mobile",
+            "gender",
+            "birth_date",
+            "achievement",
+            "education",
+            "favourite_singer",
+            "profession",
+            "reference_by",
+            "photo",
+            "photo_url",
+            "active",
+        ]
+
+    def get_display_name(self, obj):
+        return obj.name
+
+    def get_photo_url(self, obj):
+        """
+        Returns absolute URL for singer photo (or None).
+        """
+        if not obj.photo:
+            return None
+        try:
+            url = obj.photo.url
+        except ValueError:
+            return None
+
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(url)
+        return url
+
+
+
+
+
+# ---------------------------------------------------------------------
+# Singer Master (Service)
+# ---------------------------------------------------------------------
+from rest_framework import serializers
+from api.models import Singer
+
+
+class UserSingerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Singer
+        fields = "__all__"
+
