@@ -19,48 +19,56 @@ export default function UserDashboard() {
   const services = [
     {
       title: "Club Membership",
+      desc: "Join our exclusive music community with special perks and privileges",
       link: "/singer/register",
       img: "https://images.unsplash.com/photo-1514327605112-b887c0e61c0a?w=800&q=80",
       icon: Sparkles,
     },
     {
       title: "Studio Booking",
+      desc: "Professional recording studios with state-of-the-art equipment",
       link: "/studio-booking",
       img: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80",
       icon: Mic2,
     },
     {
       title: "Singing Classes",
+      desc: "Learn from industry professionals and discover your voice",
       link: "/singing-classes",
       img: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=800&q=80",
       icon: Users,
     },
     {
       title: "Live Shows & Karaoke",
+      desc: "Experience electrifying performances and showcase your talent",
       link: "/events",
       img: "https://images.unsplash.com/photo-1507679799987-c737218594e0?w=800&q=80",
       icon: Calendar,
     },
     {
       title: "Private Events",
+      desc: "Custom events for birthdays, weddings, and corporate functions",
       link: "/private-booking",
       img: "https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=800&q=80",
       icon: Star,
     },
     {
       title: "Photography",
+      desc: "Capture your special moments with professional photography",
       link: "/photography-booking",
       img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80",
       icon: Camera,
     },
     {
       title: "Videography",
+      desc: "Cinematic video production for all your creative needs",
       link: "/videography",
       img: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&q=80",
       icon: Camera,
     },
     {
       title: "Sound System",
+      desc: "Premium audio equipment rental for any event",
       link: "/sound-booking",
       img: "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80",
       icon: Speaker,
@@ -69,7 +77,7 @@ export default function UserDashboard() {
 
   return (
     <div className="bg-white min-h-screen">
-      {/* ================= HERO - UPGRADED & SUPER ATTRACTIVE ================= */}
+      {/* ================= HERO ================= */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         <video
           className="absolute inset-0 w-full h-full object-cover"
@@ -89,7 +97,6 @@ export default function UserDashboard() {
           transition={{ duration: 1.6, ease: "easeOut" }}
           className="relative z-10 text-center px-6 max-w-7xl mx-auto"
         >
-          {/* Welcome Text */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -99,7 +106,6 @@ export default function UserDashboard() {
             WELCOME TO IMC MUSIC HUB
           </motion.p>
 
-          {/* Main Title */}
           <motion.h1
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
@@ -110,7 +116,6 @@ export default function UserDashboard() {
             <span className="text-orange-500">Comes Alive</span>
           </motion.h1>
 
-          {/* Description */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -120,14 +125,13 @@ export default function UserDashboard() {
             Experience world-class studio recording, professional singing classes, spectacular live events, and premium audio-visual services — all under one roof.
           </motion.p>
 
-          {/* CTA Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 1.6, duration: 0.8 }}
             className="flex flex-col sm:flex-row gap-10 justify-center"
           >
-          
+            {/* Empty as in your code */}
           </motion.div>
         </motion.div>
       </section>
@@ -136,7 +140,7 @@ export default function UserDashboard() {
       <section className="py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <p className="text-orange-500 font-bold text-xl mb-4 tracking-wider">
+            <p className="text-orange-500 font-bold text-xl mb-4 tracking-widest">
               WHAT WE OFFER
             </p>
             <h2 className="text-6xl md:text-7xl font-black mb-8 text-gray-800">
@@ -166,8 +170,8 @@ export default function UserDashboard() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
 
-                    {/* Small Icon in bottom-left */}
-                    <div className="absolute bottom-8 left-8">
+                    {/* ICON MOVED TO TOP-RIGHT */}
+                    <div className="absolute top-8 right-8">
                       <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center shadow-xl">
                         <service.icon className="w-10 h-10 text-white" />
                       </div>
@@ -191,7 +195,7 @@ export default function UserDashboard() {
       <section className="py-32 bg-gradient-to-b from-[#FFF8E1] to-[#FFEDD5]">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-20">
-            <p className="text-orange-600 font-bold text-xl mb-4 tracking-wider">
+            <p className="text-orange-600 font-bold text-xl mb-4 tracking-widest">
               DON'T MISS OUT
             </p>
             <h2 className="text-6xl md:text-7xl font-black mb-8 text-gray-800">
@@ -257,9 +261,10 @@ export default function UserDashboard() {
 
                   <div className="flex items-center justify-between">
                     <p className="text-4xl font-black text-orange-600">{event.price}</p>
+
                     <Link
                       to="/events-booking"
-                      className="px-10 py-5 bg-orange-500 text-white rounded-full font-black text-xl hover:bg-orange-600 transform hover:scale-110 transition-all duration-500 shadow-xl"
+                      className="px-8 py-4 bg-orange-500 text-white rounded-full font-bold text-lg hover:bg-orange-600 transform hover:scale-105 transition-all duration-300 shadow-lg"
                     >
                       Book Now
                     </Link>
