@@ -124,15 +124,6 @@ export default function UserDashboard() {
           >
             Experience world-class studio recording, professional singing classes, spectacular live events, and premium audio-visual services — all under one roof.
           </motion.p>
-
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.6, duration: 0.8 }}
-            className="flex flex-col sm:flex-row gap-10 justify-center"
-          >
-            {/* Empty as in your code */}
-          </motion.div>
         </motion.div>
       </section>
 
@@ -170,7 +161,6 @@ export default function UserDashboard() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
 
-                    {/* ICON MOVED TO TOP-RIGHT */}
                     <div className="absolute top-8 right-8">
                       <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center shadow-xl">
                         <service.icon className="w-10 h-10 text-white" />
@@ -276,37 +266,65 @@ export default function UserDashboard() {
         </div>
       </section>
 
-      {/* ================= CTA ================= */}
-      <section className="py-24 bg-gradient-to-br from-[#FFF8E1] to-[#FFEDD5]">
-        <div className="max-w-5xl mx-auto px-6 text-center">
+      {/* ================= FINAL ATTRACTIVE CTA - MATCHING YOUR DESIGN ================= */}
+      <section className="py-32 bg-gradient-to-br from-orange-50 to-amber-50">
+        <div className="max-w-6xl mx-auto px-6 text-center">
           <motion.div
-            initial={{ opacity: 0, y: 40 }}
+            initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            transition={{ duration: 1 }}
           >
-            <h2 className="text-5xl md:text-6xl font-black mb-8 text-gray-800">
+            {/* Sparkle accent line */}
+            <div className="flex items-center justify-center gap-6 mb-8">
+              <Sparkles className="w-8 h-8 text-orange-500" />
+              <span className="text-orange-600 font-bold text-xl tracking-widest uppercase">
+                Your Musical Journey Starts Here
+              </span>
+              <Sparkles className="w-8 h-8 text-orange-500" />
+            </div>
+
+            {/* Main heading */}
+            <h2 className="text-5xl md:text-6xl lg:text-7xl font-black mb-8 text-gray-900">
               Ready to Make<br />
               <span className="text-orange-600">Music Magic?</span>
             </h2>
 
-            <p className="text-xl text-gray-700 mb-12 max-w-3xl mx-auto leading-relaxed">
-              Join thousands of artists who have found their musical home at IMC
+            {/* Description */}
+            <p className="text-2xl md:text-3xl text-gray-700 mb-16 max-w-4xl mx-auto font-medium">
+              Join thousands of artists who have found their musical<br />
+              <span className="text-gray-800 font-bold">home at IMC</span>
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-10 justify-center">
+            {/* Buttons - Clean pill design, NO underlines at all */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 mb-16">
+              {/* Primary Button - Only text + arrow, no underline */}
               <Link
-                to="/services"
-                className="px-20 py-6 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full font-bold text-white text-2xl shadow-xl hover:shadow-orange-500/40 transform hover:scale-105 transition-all duration-300"
+                to="/singer/register"
+                className="relative p-3 bg-orange-500 rounded-full shadow-2xl flex flex-col items-center"
               >
-                Get Started →
+                <span className="text-white font-bold text-2xl">
+                  Get Started Now
+                </span>
+               
               </Link>
+
+              {/* Secondary Button */}
               <Link
                 to="/contact"
-                className="px-20 py-6 border-4 border-orange-600 rounded-full font-bold text-orange-600 text-2xl bg-white hover:bg-orange-50 transform hover:scale-105 transition-all duration-300"
+                className="p-3 bg-white border-4 border-orange-500 rounded-full shadow-2xl"
               >
-                Contact Us
+                <span className="text-blue-600 font-bold text-2xl underline decoration-blue-600/70">
+                  Contact Us
+                </span>
               </Link>
             </div>
+
+            {/* Trust indicator */}
+            <p className="text-lg text-gray-600 font-medium flex items-center justify-center gap-3">
+              <span className="text-2xl rotate-12">🎤</span>
+              Trusted by <span className="text-orange-600 font-black">5,000+</span> singers, performers & music lovers
+            </p>
           </motion.div>
         </div>
       </section>
