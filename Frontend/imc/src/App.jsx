@@ -45,7 +45,12 @@ import UserEventBookingForm from "./userDashboard/Forms/UserEvents";
 /* ================= PAYMENT ================= */
 import PaymentPage from "./userDashboard/payment/PaymentPage";
 
-/* ================= AUTH HELPER ================= */
+/* ================= ASSETS ================= */
+import "./App.css";
+import Img1 from "./assets/banner.jpg";
+import Img2 from "./assets/banner1.JPG";
+
+/* ================= AUTH HELPERS ================= */
 const getUserInfo = () => {
   const token = localStorage.getItem("access");
   let user = null;

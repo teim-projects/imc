@@ -12,26 +12,16 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-# Optional Google login imports
-try:
-    from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
-    from allauth.socialaccount.providers.oauth2.client import OAuth2Client
-    from dj_rest_auth.registration.views import SocialLoginView
-    _GOOGLE_OK = True
-except Exception:
-    GoogleOAuth2Adapter = None
-    OAuth2Client = None
-    SocialLoginView = APIView
-    _GOOGLE_OK = False
+from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
+from allauth.socialaccount.providers.oauth2.client import OAuth2Client
+from dj_rest_auth.registration.views import SocialLoginView
 
-try:
-    from google.oauth2 import id_token   # type: ignore
-    from google.auth.transport import requests  # type: ignore
-    _GOOGLE_VERIFY_OK = True
-except Exception:
-    id_token = None
-    requests = None
-    _GOOGLE_VERIFY_OK = False
+from google.oauth2 import id_token  # type: ignore
+from google.auth.transport import requests  # type: ignore
+
+
+
+import os
 
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -77,53 +67,53 @@ class DefaultPagination(PageNumberPagination):
 # Google OAuth2 Login → JWT (safe stub)
 # ====================================================================
 class GoogleLogin(SocialLoginView):
-    if _GOOGLE_OK:
-        adapter_class = GoogleOAuth2Adapter  # type: ignore
-        client_class = OAuth2Client          # type: ignore
-    callback_url = os.getenv("GOOGLE_CALLBACK_URL")
+    adapter_class = GoogleOAuth2Adapter
+    client_class = OAuth2Client
+    # callback_url = "http://127.0.0.1:8000/accounts/google/login/callback/"
+    callback_url = os.getenv('GOOGLE_CALLBACK_URL')
 
     def post(self, request, *args, **kwargs):
-        if not (_GOOGLE_OK and _GOOGLE_VERIFY_OK):
-            return Response({"error": "Google login not configured on this server."},
-                            status=status.HTTP_501_NOT_IMPLEMENTED)
-
+        """
+        Verify Google token → get/create user → issue JWT tokens.
+        """
         token = request.data.get("access_token")
         if not token:
             return Response({"error": "Missing access_token"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            idinfo = id_token.verify_oauth2_token(  # type: ignore
+            # ✅ Verify token with Google
+            idinfo = id_token.verify_oauth2_token(
                 token,
-                requests.Request(),  # type: ignore
-                os.getenv("GOOGLE_CLIENT_ID"),
+                requests.Request(),
+                os.getenv('GOOGLE_CLIENT_ID')
+                # "129181997839-0rlmm080229tetuka9c0i83la4r4lhdt.apps.googleusercontent.com"
             )
+
             email = idinfo.get("email")
             name = idinfo.get("name", "")
+            picture = idinfo.get("picture", "")
 
-            if not email:
-                return Response({"error": "Google token missing email"}, status=status.HTTP_400_BAD_REQUEST)
-
+            # ✅ Get or create user
             user, created = User.objects.get_or_create(email=email)
             if created:
                 user.is_active = True
-                parts = (name or "").split()
-                if hasattr(user, "first_name"):
-                    user.first_name = parts[0] if parts else ""
-                if hasattr(user, "last_name"):
-                    user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+                if hasattr(user, "full_name"):
+                    user.full_name = name
+                if hasattr(user, "profile_photo") and picture:
+                    user.profile_photo = picture
                 user.save()
 
+            # ✅ Generate JWT tokens for this user
             refresh = RefreshToken.for_user(user)
-            return Response(
-                {
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                    "email": user.email,
-                    "name": name,
-                    "message": "Google login successful",
-                },
-                status=status.HTTP_200_OK,
-            )
+            data = {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "email": user.email,
+                "name": name,
+                "message": "Google login successful"
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
 
         except ValueError as ve:
             return Response({"error": "Invalid Google token", "details": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
