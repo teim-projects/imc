@@ -393,17 +393,7 @@ const EventsForm = ({ onClose }) => {
           >
             View Events
           </button>
-          {onClose && (
-            <button
-              type="button"
-              className="btn ghost"
-              style={{ marginLeft: 8 }}
-              onClick={onClose}
-              aria-label="Close"
-            >
-              Close
-            </button>
-          )}
+      
         </div>
       </div>
 

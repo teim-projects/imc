@@ -16,7 +16,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 // Import the new Footer component
-import Footer from "../../components/Footer";
+import Footer from "../../components/footer";
 
 /* ===================== API CONFIG ===================== */
 const BASE =
@@ -365,7 +365,7 @@ export default function UserEvents() {
       </div>
 
       {/* Reusable Footer Component */}
-      <Footer />
+      <footer />
 
       {/* Booking Modal */}
       {activeEvent && (

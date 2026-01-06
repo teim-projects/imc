@@ -265,17 +265,7 @@ const PrivateBookingForm = ({ onClose, viewOnly = false }) => {
           >
             View Bookings
           </button>
-          {onClose && (
-            <button
-              type="button"
-              className="btn ghost"
-              style={{ marginLeft: 8 }}
-              onClick={onClose}
-              aria-label="Close"
-            >
-              Close
-            </button>
-          )}
+          
         </div>
       </div>
 

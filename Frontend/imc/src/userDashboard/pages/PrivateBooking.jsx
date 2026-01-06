@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
-import Footer from "../../components/Footer";
+import Footer from "../../components/footer";
 import SingerBackground from "../../assets/singerbag.jpg"; // You can replace with event-themed image
 import {
   Loader2,
@@ -521,7 +521,7 @@ export default function PrivateEventBooking() {
         </div>
       </section>
 
-      <Footer />
+      <footer />
     </div>
   );
 }

@@ -800,7 +800,7 @@ from django.db.models import Q
 
 
 # --------------------------------------------------
-# IMAGE UPLOAD HELPERS (DO NOT DELETE)
+# IMAGE UPLOAD HELPERS
 # --------------------------------------------------
 def singer_photo_upload_to(instance, filename):
     ext = filename.split('.')[-1] if '.' in filename else 'jpg'
@@ -808,16 +808,12 @@ def singer_photo_upload_to(instance, filename):
     return os.path.join("singers", filename)
 
 
-def singer_upload_to(instance, filename):
-    return singer_photo_upload_to(instance, filename)
-
-
 # --------------------------------------------------
 # SINGER MODEL
 # --------------------------------------------------
 class Singer(models.Model):
 
-    # ✅ STRING PRIMARY KEY
+    # 🔑 URL-SAFE PRIMARY KEY
     id = models.CharField(
         max_length=20,
         primary_key=True,
@@ -851,40 +847,33 @@ class Singer(models.Model):
     active = models.BooleanField(default=True)
     photo = models.ImageField(upload_to=singer_photo_upload_to, null=True, blank=True)
 
-    # ✅ DATE ONLY (AUTO HANDLED)
     created_at = models.DateField(editable=False)
     updated_at = models.DateField(editable=False)
 
     class Meta:
         ordering = ['-created_at']
-        verbose_name = "Singer"
-        verbose_name_plural = "Singers"
 
     # --------------------------------------------------
-    # SAFE AUTO-ID + DATE LOGIC (NO DUPLICATES EVER)
+    # AUTO ID GENERATION (URL SAFE)
     # --------------------------------------------------
     def save(self, *args, **kwargs):
-
-        # 🔐 AUTO ID ONLY FOR NEW RECORD
         if not self.id:
             with transaction.atomic():
                 ids = (
                     Singer.objects
                     .select_for_update()
-                    .filter(id__startswith="IMC/SM-")
-                    .exclude(Q(id="") | Q(id__isnull=True))
+                    .filter(id__startswith="IMC-SM-")
                     .values_list("id", flat=True)
                 )
 
                 max_num = 0
                 for i in ids:
-                    match = re.search(r"IMC/SM-(\d+)$", i)
+                    match = re.search(r"IMC-SM-(\d+)$", i)
                     if match:
                         max_num = max(max_num, int(match.group(1)))
 
-                self.id = f"IMC/SM-{max_num + 1:03d}"
+                self.id = f"IMC-SM-{max_num + 1:03d}"
 
-        # 📅 DATE ONLY AUTO
         if not self.created_at:
             self.created_at = date.today()
 
@@ -892,8 +881,19 @@ class Singer(models.Model):
 
         super().save(*args, **kwargs)
 
+    # --------------------------------------------------
+    # DISPLAY CODE (NO DB COLUMN)
+    # --------------------------------------------------
+    @property
+    def display_code(self):
+        """
+        Convert IMC-SM-001 → IMC/SM-001
+        """
+        return self.id.replace("-", "/", 1)
+
     def __str__(self):
-        return f"{self.id} - {self.name}"
+        return f"{self.display_code} - {self.name}"
+
 
 # ===============================================
 # ============  Singing (SERVICE)  =========
@@ -1035,3 +1035,41 @@ class Batch(models.Model):
 
     def __str__(self):
         return f"{self.class_obj.name} - {self.day} {self.time_slot}"
+
+
+
+
+
+
+import uuid
+from django.db import models
+
+class AnnualFee(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    singer = models.ForeignKey(
+        "Singer",
+        on_delete=models.CASCADE,
+        related_name="annual_fees"
+    )
+
+    year = models.PositiveIntegerField()  # e.g. 2025
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    payment_method = models.CharField(
+        max_length=20,
+        choices=[("Cash", "Cash"), ("UPI", "UPI"), ("Card", "Card")],
+        default="Cash"
+    )
+
+    paid_on = models.DateField(auto_now_add=True)
+    remarks = models.CharField(max_length=255, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("singer", "year")
+        ordering = ["-year"]
+
+    def __str__(self):
+        return f"{self.singer.name} - {self.year}"

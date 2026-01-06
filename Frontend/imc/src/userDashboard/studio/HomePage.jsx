@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 // Import reusable components
 import StudioList from "./components/StudioList";
 import UserStudioRentalForm from "../Forms/UserStudioRentalForm";
-import Footer from "../../components/Footer";  // ← Added reusable Footer
+import Footer from "../../components/footer";  // ← Added reusable Footer
 
 import studioBanner from "@/assets/studio banner.jpg";
 

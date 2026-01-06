@@ -302,24 +302,7 @@ export default function SingingClassManagement() {
           )}
         </div>
 
-        {(activeTab === "class" || activeTab === "batch") && (
-          <div className="search-wrapper">
-            <input
-              type="text"
-              placeholder={`Search by ${activeTab === "class" ? "name, trainer, fee" : "day, time, teacher"}...`}
-              className="search-input"
-              value={activeTab === "class" ? classSearch : batchSearch}
-              onChange={(e) => activeTab === "class" ? setClassSearch(e.target.value) : setBatchSearch(e.target.value)}
-            />
-            <button
-              className="refresh-btn"
-              onClick={activeTab === "class" ? fetchClasses : fetchBatches}
-              disabled={activeTab === "class" ? classLoading : batchLoading}
-            >
-              {activeTab === "class" ? (classLoading ? "Loading..." : "Refresh") : (batchLoading ? "Loading..." : "Refresh")}
-            </button>
-          </div>
-        )}
+        
 
         <div className="content-area">
           {/* CLASS TAB */}

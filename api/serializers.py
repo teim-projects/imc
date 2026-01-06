@@ -732,11 +732,14 @@ class SoundSerializer(serializers.ModelSerializer):
 # ---------------------------------------------------------------------
 # Singer Master (Service)
 # ---------------------------------------------------------------------
+from datetime import datetime
 from rest_framework import serializers
 from .models import Singer
 
 
 class SingerSerializer(serializers.ModelSerializer):
+    id = serializers.CharField(read_only=True)
+
     class Meta:
         model = Singer
         fields = "__all__"
@@ -744,19 +747,67 @@ class SingerSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         data = data.copy()
 
-        # Remove frontend-only field
+        # ----------------------------------
+        # Frontend-only fields हटाओ
+        # ----------------------------------
+        data.pop("id", None)
+        data.pop("display_code", None)
         data.pop("agreed_terms", None)
 
-        # Normalize gender
-        if "gender" in data and isinstance(data["gender"], str):
-            data["gender"] = data["gender"].lower()
+        # ----------------------------------
+        # 🔥 BIRTH DATE – ACCEPT ANY FORMAT
+        # ----------------------------------
+        birth_date = data.get("birth_date")
 
-        # Convert empty strings to None
-        for field in ["experience", "rate", "birth_date"]:
-            if field in data and data[field] == "":
+        if not birth_date or birth_date in ["0000-00-00", "null", "None"]:
+            data["birth_date"] = None
+        else:
+            parsed_date = None
+            date_formats = [
+                "%Y-%m-%d",   # 1999-12-25
+                "%d-%m-%Y",   # 25-12-1999
+                "%d/%m/%Y",   # 25/12/1999
+                "%m/%d/%Y",   # 12/25/1999
+            ]
+
+            for fmt in date_formats:
+                try:
+                    parsed_date = datetime.strptime(birth_date, fmt).date()
+                    break
+                except ValueError:
+                    pass
+
+            if not parsed_date:
+                raise serializers.ValidationError({
+                    "birth_date": "Invalid date format. Use DD-MM-YYYY or YYYY-MM-DD"
+                })
+
+            data["birth_date"] = parsed_date  # ✅ Django DateField
+
+        # ----------------------------------
+        # Gender normalize
+        # ----------------------------------
+        gender = data.get("gender")
+        if isinstance(gender, str):
+            gender_map = {
+                "male": "male",
+                "m": "male",
+                "female": "female",
+                "f": "female",
+                "other": "other",
+                "others": "other",
+            }
+            data["gender"] = gender_map.get(gender.lower(), gender.lower())
+
+        # ----------------------------------
+        # Empty strings → NULL
+        # ----------------------------------
+        for field in ["experience", "rate", "education", "achievement"]:
+            if data.get(field) == "":
                 data[field] = None
 
         return super().to_internal_value(data)
+
 
 
 
@@ -856,3 +907,16 @@ class BatchSerializer(serializers.ModelSerializer):
             "created_at",
         ]
 
+
+
+
+
+from rest_framework import serializers
+from .models import AnnualFee
+
+class AnnualFeeSerializer(serializers.ModelSerializer):
+    singer_name = serializers.CharField(source="singer.name", read_only=True)
+
+    class Meta:
+        model = AnnualFee
+        fields = "__all__"

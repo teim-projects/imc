@@ -1,26 +1,31 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import GoogleAuthButton from "./GoogleAuthButton";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
-const PHONE_RE = /^[0-9]{10}$/; // IN 10-digit
-const MAX_PHOTO_MB = 3;
+const PHONE_RE = /^[0-9]{10}$/;
+const MAX_PHOTO_MB = 5;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const PHOTO_FIELD_NAME = "photo"; // 🔁 must match your Django field (e.g., "photo" or "profile_image")
+const PHOTO_FIELD_NAME = "photo";
 
 const Register = () => {
   const navigate = useNavigate();
   const REGISTER_URL = `${import.meta.env.VITE_BASE_API_URL}/auth/dj-rest-auth/registration/`;
 
-  const [form, setForm] = useState({ email: "", mobile_no: "", password1: "", password2: "" });
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    mobile_no: "",
+    password1: "",
+    password2: "",
+  });
   const [touched, setTouched] = useState({});
-  const [fieldErrors, setFieldErrors] = useState({}); // ← server-side field errors
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [show1, setShow1] = useState(false);
-  const [show2, setShow2] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(false);
 
-  // Photo state
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const [photoError, setPhotoError] = useState("");
@@ -28,73 +33,52 @@ const Register = () => {
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    // clear server error for that field once user edits
     if (fieldErrors[e.target.name]) {
-      setFieldErrors((fe) => ({ ...fe, [e.target.name]: null }));
+      setFieldErrors((prev) => ({ ...prev, [e.target.name]: null }));
     }
   };
-  const handleBlur = (e) => setTouched({ ...touched, [e.target.name]: true });
 
-  // validations
-  const emailErr = useMemo(
-    () => (form.email && !EMAIL_RE.test(form.email) ? "Invalid email" : ""),
-    [form.email]
-  );
-  const phoneErr = useMemo(
-    () => (form.mobile_no && !PHONE_RE.test(form.mobile_no) ? "Enter 10-digit mobile" : ""),
-    [form.mobile_no]
-  );
-  const passMatchErr = useMemo(
+  const handleBlur = (e) => setTouched((prev) => ({ ...prev, [e.target.name]: true }));
+
+  const emailErr = useMemo(() => (form.email && !EMAIL_RE.test(form.email) ? "Invalid email" : ""), [form.email]);
+  const mobileErr = useMemo(() => (form.mobile_no && !PHONE_RE.test(form.mobile_no) ? "10-digit number required" : ""), [form.mobile_no]);
+  const passwordMatchErr = useMemo(
     () => (form.password2 && form.password1 !== form.password2 ? "Passwords do not match" : ""),
     [form.password1, form.password2]
   );
 
-  const strength = useMemo(() => passwordStrength(form.password1), [form.password1]);
-  const allValid = EMAIL_RE.test(form.email) && PHONE_RE.test(form.mobile_no) && form.password1 && !passMatchErr;
+  const isFormValid =
+    form.full_name.trim().length >= 2 &&
+    EMAIL_RE.test(form.email) &&
+    PHONE_RE.test(form.mobile_no) &&
+    form.password1.length >= 8 &&
+    !passwordMatchErr &&
+    agreeTerms;
 
-  // ---- Photo helpers ----
-  const validateAndSetPhoto = (file) => {
+  const handlePhoto = (file) => {
     if (!file) return;
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setPhotoError("Only JPG, PNG or WebP allowed.");
-      return;
-    }
-    if (file.size > MAX_PHOTO_MB * 1024 * 1024) {
-      setPhotoError(`Max size ${MAX_PHOTO_MB} MB.`);
-      return;
-    }
+    if (!ALLOWED_TYPES.includes(file.type)) return setPhotoError("Only JPG, PNG, WebP allowed");
+    if (file.size > MAX_PHOTO_MB * 1024 * 1024) return setPhotoError(`Max ${MAX_PHOTO_MB}MB`);
+
     setPhotoError("");
     setPhotoFile(file);
-    const url = URL.createObjectURL(file);
-    setPhotoPreview(url);
-    // clear any server photo error after new pick
-    if (fieldErrors[PHOTO_FIELD_NAME]) {
-      setFieldErrors((fe) => ({ ...fe, [PHOTO_FIELD_NAME]: null }));
-    }
+    setPhotoPreview(URL.createObjectURL(file));
   };
 
-  const onFilePick = (e) => validateAndSetPhoto(e.target.files?.[0]);
-  const onDrop = (e) => { e.preventDefault(); e.stopPropagation(); validateAndSetPhoto(e.dataTransfer.files?.[0]); };
-  const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); };
-  const removePhoto = () => {
-    setPhotoFile(null);
+  useEffect(() => () => {
     if (photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoPreview("");
-  };
-
-  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
+  }, [photoPreview]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setFieldErrors({});
-    if (!allValid) { setMessage("Please fix the highlighted fields."); return; }
-    if (photoError) { setMessage("Please fix the photo issue."); return; }
+    if (!isFormValid) return;
 
     setLoading(true);
-    setMessage("Registering...");
+    setMessage("Creating your account...");
+
     try {
-      // Always send as multipart/form-data (supports file)
       const fd = new FormData();
+      fd.append("full_name", form.full_name);
       fd.append("email", form.email);
       fd.append("mobile_no", form.mobile_no);
       fd.append("password1", form.password1);
@@ -102,402 +86,486 @@ const Register = () => {
       if (photoFile) fd.append(PHOTO_FIELD_NAME, photoFile);
 
       const res = await fetch(REGISTER_URL, { method: "POST", body: fd });
-      let data = {};
-      try { data = await res.json(); } catch { data = {}; }
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // dj-rest-auth / DRF will usually return field dict like {mobile_no:["msg"], email:["msg"], photo:["msg"], non_field_errors:["msg"]}
-        if (data && typeof data === "object") {
-          const normalized = {};
-          for (const [k, v] of Object.entries(data)) {
-            if (Array.isArray(v) && v.length) normalized[k] = v[0];
-            else if (typeof v === "string") normalized[k] = v;
-          }
-          setFieldErrors(normalized);
-          // prefer a banner for non-field or detail errors
-          setMessage(normalized.detail || normalized.non_field_errors || "❌ Registration failed. Please check the fields.");
-        } else {
-          setMessage("❌ Registration failed.");
-        }
+        const errors = {};
+        Object.entries(data).forEach(([k, v]) => {
+          errors[k] = Array.isArray(v) ? v[0] : v;
+        });
+        setFieldErrors(errors);
+        setMessage("Please check the highlighted fields");
         return;
       }
 
-      setMessage("✅ Registration successful! Redirecting to login...");
-      setTimeout(() => navigate("/login"), 1200);
-    } catch (err) {
-      console.error(err);
-      setMessage("⚠️ Error connecting to the server.");
+      setMessage("Welcome! Redirecting...");
+      setTimeout(() => navigate("/dashboard"), 1500);
+    } catch {
+      setMessage("Connection error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Combine client + server errors for inputs
-  const emailErrorCombined = (touched.email && emailErr) || fieldErrors.email || null;
-  const phoneErrorCombined = (touched.mobile_no && phoneErr) || fieldErrors.mobile_no || null;
-  const pass2ErrorCombined = (touched.password2 && passMatchErr) || fieldErrors.password2 || null;
-
   return (
-    <div style={styles.page}>
-      {/* Decorative sky + arcs */}
-      <div style={styles.arcs}>
-        <div style={{ ...styles.arc, width: 900, height: 900 }} />
-        <div style={{ ...styles.arc, width: 1300, height: 1300 }} />
-      </div>
+    <div className="register-page">
+      <div className="auth-container">
+        {/* Left - Welcome */}
+        <div className="welcome-side">
+          <div className="welcome-overlay"></div>
+          <div className="welcome-content">
+            <h1>Welcome</h1>
+            <p>
+              Join our warm community and start<br />
+              meaningful connections today.
+            </p>
+          </div>
+        </div>
 
-      {/* Brand */}
-      <div style={styles.brandWrap}>
-        <div style={styles.brandBadge}><LogoBox /></div>
-        <span style={styles.brandText}>Ebolt</span>
-      </div>
+        {/* Right - Compact Form */}
+        <div className="form-side">
+          <div className="form-card">
+            <h2 className="form-title">Create Account</h2>
 
-      {/* Card */}
-      <div style={styles.cardGlow}>
-        <div style={styles.card}>
-          <div style={styles.cardIconWrap}><div style={styles.cardIconCircle}><LoginIcon /></div></div>
-          <h2 style={styles.title}>Create your account</h2>
-          <p style={styles.subtitle}>Fast, secure sign up. Collaborate with your team in one place.</p>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group floating-group">
+                <input
+                  type="text"
+                  name="full_name"
+                  id="fullName"
+                  value={form.full_name}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  required
+                  placeholder=" "
+                />
+                <label htmlFor="fullName">Full Name</label>
+                {touched.full_name && fieldErrors.full_name && <span className="error">{fieldErrors.full_name}</span>}
+              </div>
 
-          <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-            {/* Email */}
-            <FloatingInput
-              label="Email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={emailErrorCombined}
-            />
+              <div className="form-group floating-group">
+                <input
+                  type="email"
+                  name="email"
+                  id="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  required
+                  placeholder=" "
+                />
+                <label htmlFor="email">Email</label>
+                {(touched.email && (emailErr || fieldErrors.email)) && <span className="error">{emailErr || fieldErrors.email}</span>}
+              </div>
 
-            {/* Mobile */}
-            <FloatingInput
-              label="Mobile Number"
-              name="mobile_no"
-              type="tel"
-              value={form.mobile_no}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={phoneErrorCombined}
-              maxLength={10}
-            />
+              <div className="form-group floating-group">
+                <input
+                  type="tel"
+                  name="mobile_no"
+                  id="mobile"
+                  maxLength={10}
+                  value={form.mobile_no}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  required
+                  placeholder=" "
+                />
+                <label htmlFor="mobile">Mobile Number</label>
+                {(touched.mobile_no && (mobileErr || fieldErrors.mobile_no)) && <span className="error">{mobileErr || fieldErrors.mobile_no}</span>}
+              </div>
 
-            {/* Password */}
-            <FloatingInput
-              label="Password"
-              name="password1"
-              type={show1 ? "text" : "password"}
-              value={form.password1}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              rightIcon={<EyeButton onClick={() => setShow1((s) => !s)} shown={show1} />}
-              error={fieldErrors.password1}
-            />
+              <div className="form-group floating-group password-group">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  name="password1"
+                  id="password1"
+                  value={form.password1}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  required
+                  placeholder=" "
+                />
+                <label htmlFor="password1">Password</label>
+                <button type="button" className="show-hide" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+                {fieldErrors.password1 && <span className="error">{fieldErrors.password1}</span>}
+              </div>
 
-            {/* Strength meter */}
-            <StrengthBar strength={strength} />
+              <div className="form-group floating-group">
+                <input
+                  type="password"
+                  name="password2"
+                  id="password2"
+                  value={form.password2}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  required
+                  placeholder=" "
+                />
+                <label htmlFor="password2">Confirm Password</label>
+                {(touched.password2 && passwordMatchErr) && <span className="error">{passwordMatchErr}</span>}
+              </div>
 
-            {/* Confirm */}
-            <FloatingInput
-              label="Confirm Password"
-              name="password2"
-              type={show2 ? "text" : "password"}
-              value={form.password2}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              error={pass2ErrorCombined}
-              rightIcon={<EyeButton onClick={() => setShow2((s) => !s)} shown={show2} />}
-            />
-
-            {/* Photo upload (inline) */}
-            <div style={{ marginTop: 14 }}>
-              {!photoPreview ? (
+              <div className="form-group photo-group">
+                <label>Profile Photo (optional)</label>
                 <div
-                  onDrop={onDrop}
-                  onDragOver={onDragOver}
-                  style={styles.dropZone}
+                  className="photo-upload"
                   onClick={() => fileInputRef.current?.click()}
+                  onDrop={(e) => { e.preventDefault(); handlePhoto(e.dataTransfer.files[0]); }}
+                  onDragOver={(e) => e.preventDefault()}
                 >
-                  <UploadIcon />
-                  <p style={{ margin: "8px 0 2px", color: "#111827", fontSize: 14, fontWeight: 600 }}>
-                    Add your profile photo (optional)
-                  </p>
-                  <p style={{ margin: 0, color: "#6b7280", fontSize: 12 }}>
-                    JPG, PNG or WebP • up to {MAX_PHOTO_MB} MB
-                  </p>
-                  <button type="button" style={styles.pickBtn}>Choose file</button>
+                  {photoPreview ? (
+                    <div className="preview-container">
+                      <img src={photoPreview} alt="preview" className="photo-preview" />
+                      <button
+                        type="button"
+                        className="remove-photo"
+                        onClick={() => { setPhotoFile(null); setPhotoPreview(""); }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="upload-placeholder">
+                      <span className="upload-icon">↑</span>
+                      <span>Upload</span>
+                    </div>
+                  )}
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    style={{ display: "none" }}
-                    onChange={onFilePick}
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => handlePhoto(e.target.files?.[0])}
                   />
                 </div>
-              ) : (
-                <div style={styles.previewWrap}>
-                  <img src={photoPreview} alt="preview" style={styles.previewImg} />
-                  <div style={styles.previewMeta}>
-                    <span style={styles.previewText}>{photoFile?.name}</span>
-                    <button type="button" onClick={removePhoto} style={styles.removeBtn}>Remove</button>
-                  </div>
+                {photoError && <span className="error">{photoError}</span>}
+                {fieldErrors.photo && <span className="error">{fieldErrors.photo}</span>}
+              </div>
+
+              <div className="terms">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={(e) => setAgreeTerms(e.target.checked)}
+                  />
+                  <span>
+                    I agree to the <a href="#" className="terms-link">Terms of Service</a>
+                  </span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className={`submit-btn ${!isFormValid || loading ? "disabled" : ""}`}
+                disabled={!isFormValid || loading}
+              >
+                {loading ? "Creating..." : "Create Account"}
+              </button>
+
+              {message && (
+                <div className={`status-message ${message.includes("Welcome") ? "success" : "error"}`}>
+                  {message}
                 </div>
               )}
-              {(photoError || fieldErrors[PHOTO_FIELD_NAME]) && (
-                <div style={styles.errorText}>{photoError || fieldErrors[PHOTO_FIELD_NAME]}</div>
-              )}
+            </form>
+
+            <div className="social-section">
+              <div className="social-divider">
+                <span>or continue with</span>
+              </div>
+              <GoogleAuthButton endpoint="/auth/google/" onSuccessNavigate="/dashboard" />
             </div>
-
-            <button
-              type="submit"
-              style={{ ...styles.cta, opacity: allValid ? 1 : 0.6, cursor: allValid ? "pointer" : "not-allowed" }}
-              disabled={!allValid || loading}
-            >
-              {loading ? <Spinner /> : "Create account"}
-            </button>
-          </form>
-
-          <p style={{ fontSize: 13, marginTop: 12 }}>
-            Already have an account? <a href="/login" style={{ color: '#2563eb', textDecoration: 'none' }}>Sign in</a>
-          </p>
-
-          <div style={styles.dividerRow}><span style={styles.dots} /><span style={styles.muted}>Or continue with</span><span style={styles.dots} /></div>
-
-          <div style={{ width: "100%", marginTop: 8 }}>
-            <GoogleAuthButton endpoint="/auth/auth/google/" onSuccessNavigate="/dashboard" />
           </div>
-
-          {message && <p style={styles.message}>{message}</p>}
         </div>
       </div>
 
-      <style>{globalCss}</style>
+      <style jsx global>{`
+        html, body {
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+        }
+
+        .register-page {
+          height: 100vh;
+          background: linear-gradient(135deg, #fdfbf7 0%, #f8f1e9 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1rem;
+          font-family: system-ui, sans-serif;
+          overflow-y: auto;
+        }
+
+        .auth-container {
+          display: grid;
+          grid-template-columns: 1fr 380px;
+          max-width: 1000px;
+          width: 100%;
+          background: rgba(255, 248, 240, 0.95);
+          border-radius: 24px;
+          overflow: hidden;
+          border: 1px solid rgba(212, 163, 115, 0.25);
+          box-shadow: 0 20px 60px rgba(139, 92, 46, 0.18);
+          height: fit-content;
+          max-height: 95vh;
+        }
+
+        .welcome-side {
+          background: url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=90') center/cover no-repeat;
+          position: relative;
+        }
+
+        .welcome-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(253, 251, 247, 0.65), rgba(248, 241, 233, 0.45));
+        }
+
+        .welcome-content {
+          position: relative;
+          z-index: 2;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          text-align: center;
+          padding: 3rem 2rem;
+          color: #4b3f2a;
+        }
+
+        .welcome-content h1 {
+          font-size: 3.8rem;
+          font-weight: 900;
+          margin: 0 0 1rem;
+          background: linear-gradient(90deg, #d4a373, #e6c68a);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .welcome-content p {
+          font-size: 1.2rem;
+          line-height: 1.6;
+          opacity: 0.9;
+          max-width: 340px;
+        }
+
+        .form-side {
+          background: #fff8f0;
+          padding: 2rem 1.8rem;
+        }
+
+        .form-card {
+          max-width: 340px;
+          margin: 0 auto;
+        }
+
+        .form-title {
+          color: #4b3f2a;
+          font-size: 1.9rem;
+          font-weight: 800;
+          margin: 0 0 1.4rem;
+          text-align: center;
+        }
+
+        .form-group {
+          position: relative;
+          margin-bottom: 1.1rem;
+        }
+
+        .form-group input {
+          width: 100%;
+          padding: 0.95rem 1.1rem;
+          border: none;
+          border-radius: 12px;
+          background: rgba(212, 163, 115, 0.15);
+          color: #4b3f2a;
+          font-size: 0.98rem;
+          transition: all 0.3s;
+        }
+
+        .form-group input:focus {
+          outline: none;
+          background: rgba(212, 163, 115, 0.25);
+          box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.2);
+        }
+
+        .form-group label {
+          position: absolute;
+          left: 1.1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #8b6f47;
+          font-size: 0.98rem;
+          pointer-events: none;
+          transition: all 0.3s ease;
+          background: #fff8f0;
+          padding: 0 6px;
+        }
+
+        .form-group input:focus + label,
+        .form-group input:not(:placeholder-shown) + label {
+          top: -0.45rem;
+          font-size: 0.8rem;
+          color: #d4a373;
+        }
+
+        .password-group {
+          position: relative;
+        }
+
+        .show-hide {
+          position: absolute;
+          right: 1.1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #8b6f47;
+          font-size: 0.85rem;
+          cursor: pointer;
+        }
+
+        .photo-upload {
+          height: 80px;
+          border: 2px dashed #d4a373;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(212, 163, 115, 0.1);
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .photo-upload:hover {
+          border-color: #e6c68a;
+          background: rgba(212, 163, 115, 0.15);
+        }
+
+        .photo-preview {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 10px;
+        }
+
+        .preview-container {
+          position: relative;
+          width: 100%;
+          height: 100%;
+        }
+
+        .remove-photo {
+          position: absolute;
+          top: 6px;
+          right: 6px;
+          width: 28px;
+          height: 28px;
+          border-radius: 50%;
+          background: rgba(0,0,0,0.7);
+          color: white;
+          border: none;
+          font-size: 1.1rem;
+          cursor: pointer;
+        }
+
+        .upload-placeholder {
+          text-align: center;
+          color: #8b6f47;
+          font-size: 0.9rem;
+        }
+
+        .upload-icon {
+          font-size: 1.6rem;
+          margin-bottom: 0.3rem;
+          display: block;
+        }
+
+        .terms {
+          margin: 0.9rem 0 1.3rem;
+          font-size: 0.92rem;
+          color: #4b3f2a;
+        }
+
+        .checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+          cursor: pointer;
+        }
+
+        .checkbox-label input {
+          width: 18px;
+          height: 18px;
+          accent-color: #d4a373;
+        }
+
+        .terms-link {
+          color: #d4a373;
+          text-decoration: underline;
+          font-weight: 500;
+        }
+
+        .submit-btn {
+          width: 100%;
+          padding: 0.95rem;
+          background: linear-gradient(90deg, #d4a373, #e6c68a);
+          color: white;
+          border: none;
+          border-radius: 12px;
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .submit-btn:hover:not(.disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(212,163,115,0.3);
+        }
+
+        .submit-btn.disabled {
+          opacity: 0.65;
+          cursor: not-allowed;
+        }
+
+        .status-message {
+          margin-top: 0.9rem;
+          padding: 0.8rem;
+          border-radius: 10px;
+          text-align: center;
+          font-size: 0.92rem;
+        }
+
+        .status-message.success { background: rgba(16,185,129,0.15); color: #059669; }
+        .status-message.error   { background: rgba(239,68,68,0.15); color: #dc2626; }
+
+        .social-divider {
+          text-align: center;
+          color: #8b6f47;
+          margin: 1.4rem 0 1rem;
+          font-size: 0.92rem;
+        }
+
+        .social-section {
+          text-align: center;
+        }
+
+        .error {
+          color: #dc2626;
+          font-size: 0.82rem;
+          margin-top: 0.4rem;
+          display: block;
+        }
+      `}</style>
     </div>
   );
 };
-
-/* ---------- UI Pieces ---------- */
-function FloatingInput({ label, rightIcon, error, ...rest }) {
-  const [focused, setFocused] = useState(false);
-  const hasValue = String(rest.value || "").length > 0;
-  return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ ...styles.inputWrap, boxShadow: focused ? "0 0 0 4px rgba(37,99,235,0.15)" : "none", borderColor: error ? "#ef4444" : "#e5e7eb" }}>
-        <label style={{ ...styles.floatingLabel, transform: hasValue || focused ? "translate(10px, -12px) scale(0.85)" : "translate(14px, 10px) scale(1)", color: error ? "#ef4444" : focused ? "#2563eb" : "#6b7280" }}>{label}</label>
-        <input
-          {...rest}
-          onFocus={() => setFocused(true)}
-          onBlur={(e) => { rest.onBlur && rest.onBlur(e); setFocused(false); }}
-          style={{ ...styles.input, paddingRight: rightIcon ? 44 : 12 }}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${rest.name}-error` : undefined}
-        />
-        {rightIcon && <div style={styles.rightIcon}>{rightIcon}</div>}
-      </div>
-      {error && <div id={`${rest.name}-error`} style={styles.errorText}>{error}</div>}
-    </div>
-  );
-}
-
-function StrengthBar({ strength }) {
-  const bars = [0,1,2,3];
-  return (
-    <div style={styles.strengthRow} aria-label="password strength">
-      {bars.map((b, i) => (
-        <div key={i} style={{ ...styles.strengthBar, background: i < strength.index ? strength.color : "#e5e7eb" }} />
-      ))}
-      <span style={styles.strengthLabel}>{strength.label}</span>
-    </div>
-  );
-}
-
-function EyeButton({ onClick, shown }) {
-  return (
-    <button type="button" onClick={onClick} style={styles.eyeBtn} aria-label={shown ? "Hide password" : "Show password"}>
-      {shown ? <EyeOffIcon /> : <EyeIcon />}
-    </button>
-  );
-}
-
-function Spinner(){
-  return (
-    <div style={styles.spinner}>
-      <div style={styles.spinnerDot} />
-    </div>
-  );
-}
-
-function LogoBox(){
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="2" y="2" width="20" height="20" rx="6" fill="#111"/>
-      <path d="M8 8h8v2H8zm0 4h8v2H8zm0 4h5v2H8z" fill="#fff"/>
-    </svg>
-  );
-}
-function LoginIcon(){
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect x="3" y="3" width="18" height="18" rx="5" fill="#111" />
-      <path d="M12 7v10M8 13l4 4 4-4" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-function EyeIcon(){
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z" stroke="#64748b" strokeWidth="1.5"/>
-      <circle cx="12" cy="12" r="3" stroke="#64748b" strokeWidth="1.5"/>
-    </svg>
-  );
-}
-function EyeOffIcon(){
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3 3l18 18" stroke="#64748b" strokeWidth="1.6"/>
-      <path d="M10 6.3A10.8 10.8 0 0 1 12 6c6 0 10 6 10 6a18.2 18.2 0 0 1-5.1 4.86" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round"/>
-      <path d="M6.1 8.5A16.3 16.3 0 0 0 2 12s4 6 10 6c1.1 0 2.16-.18 3.16-.52" stroke="#64748b" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  );
-}
-function UploadIcon(){
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M12 16V8m0 0l-3 3m3-3l3 3M5 16a4 4 0 01-4-4 4 4 0 014-4c.5 0 .97.09 1.41.25A6 6 0 0118 7a5 5 0 012 9.58M7 16h10" stroke="#374151" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-}
-
-/* ---------- Styles ---------- */
-const styles = {
-  page: {
-    minHeight: "100vh",
-    width: "100%",
-    background: "linear-gradient(180deg, #dff0ff 0%, #eaf5ff 30%, #f5fbff 60%, #ffffff 100%)",
-    position: "relative",
-    overflow: "hidden",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial",
-  },
-  arcs: { position: "absolute", inset: 0, pointerEvents: "none", display: "flex", alignItems: "center", justifyContent: "center" },
-  arc: { position: "absolute", borderRadius: "50%", border: "1px solid rgba(255,255,255,0.5)" },
-  brandWrap: { position: "absolute", top: 20, left: 20, display: "flex", alignItems: "center", gap: 10 },
-  brandBadge: { width: 32, height: 32, borderRadius: 8, background: "#f4f4f5", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 2px rgba(0,0,0,0.08) inset" },
-  brandText: { fontWeight: 600, color: "#0b1220" },
-  cardGlow: {
-    padding: 10,
-    borderRadius: 28,
-    background: "linear-gradient(180deg, rgba(37,99,235,0.18), rgba(37,99,235,0.05))",
-    boxShadow: "0 18px 55px rgba(37, 99, 235, 0.25)",
-  },
-  card: {
-    width: 440,
-    maxWidth: "calc(100vw - 32px)",
-    padding: "28px 28px 22px",
-    borderRadius: 24,
-    background: "linear-gradient(180deg, rgba(255,255,255,0.88), rgba(255,255,255,0.76))",
-    backdropFilter: "blur(12px)",
-    WebkitBackdropFilter: "blur(12px)",
-    border: "1px solid rgba(255,255,255,0.65)",
-    display: "flex",
-    alignItems: "center",
-    flexDirection: "column",
-  },
-  cardIconWrap: { marginTop: 2, marginBottom: 8 },
-  cardIconCircle: { width: 50, height: 50, borderRadius: 12, background: "#f2f4f7", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 0 rgba(0,0,0,0.06) inset" },
-  title: { fontSize: 22, margin: "10px 0 6px", color: "#0b1220", fontWeight: 700 },
-  subtitle: { margin: 0, textAlign: "center", color: "#64748b", fontSize: 13.5, lineHeight: 1.45, maxWidth: 360 },
-
-  inputWrap: { position: "relative", width: "100%", height: 54, borderRadius: 12, background: "#f8fafc", border: "1px solid #e5e7eb", transition: "box-shadow .25s, border-color .25s" },
-  floatingLabel: { position: "absolute", left: 0, top: 0, padding: "0 6px", transition: "transform .2s ease, color .2s ease", background: "linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.75))", borderRadius: 6, transformOrigin: "left" },
-  input: { width: "100%", height: "100%", border: "none", outline: "none", background: "transparent", padding: "18px 12px 10px", fontSize: 14, color: "#0b1220" },
-  rightIcon: { position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)" },
-  eyeBtn: { border: "none", background: "transparent", cursor: "pointer", padding: 6 },
-
-  // Photo
-  dropZone: {
-    border: "2px dashed #bfdbfe",
-    background: "linear-gradient(180deg, #f8fbff, #ffffff)",
-    borderRadius: 14,
-    padding: 18,
-    textAlign: "center",
-    cursor: "pointer",
-  },
-  pickBtn: {
-    marginTop: 10,
-    height: 36,
-    padding: "0 14px",
-    borderRadius: 10,
-    border: "1px solid #e5e7eb",
-    background: "#fff",
-    fontWeight: 600,
-    fontSize: 13,
-    cursor: "pointer",
-  },
-  previewWrap: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    border: "1px solid #e5e7eb",
-    borderRadius: 14,
-    padding: 10,
-    background: "#fff",
-  },
-  previewImg: { width: 64, height: 64, objectFit: "cover", borderRadius: 12, border: "1px solid #e5e7eb" },
-  previewMeta: { display: "flex", alignItems: "center", gap: 10 },
-  previewText: { fontSize: 13, color: "#374151", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  removeBtn: {
-    height: 30,
-    padding: "0 10px",
-    borderRadius: 10,
-    border: "1px solid #ef4444",
-    background: "linear-gradient(180deg, #fee2e2, #fecaca)",
-    color: "#991b1b",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  cta: { width: "100%", height: 46, marginTop: 16, borderRadius: 12, border: "1px solid #0b0b0c", background: "linear-gradient(180deg, #2b2c30, #0f0f12)", color: "#fff", fontWeight: 700, letterSpacing: 0.2 },
-  dividerRow: { display: "flex", alignItems: "center", gap: 12, marginTop: 18, color: "#6b7280", fontSize: 12.5 },
-  dots: { flex: 1, height: 1, background: "repeating-linear-gradient(90deg, rgba(0,0,0,0.12) 0, rgba(0,0,0,0.12) 6px, transparent 6px, transparent 12px)" },
-  muted: { whiteSpace: "nowrap" },
-  message: { marginTop: 12, color: '#374151', fontSize: 13, textAlign: 'center' },
-  strengthRow: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 },
-  strengthBar: { flex: 1, height: 6, borderRadius: 6, transition: "background .25s" },
-  strengthLabel: { fontSize: 12, color: "#6b7280", width: 80, textAlign: "right" },
-  spinner: { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, position: "relative" },
-  spinnerDot: { width: 12, height: 12, border: "2px solid #fff", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite" },
-};
-
-const globalCss = `
-:root { --cloud: rgba(255,255,255,0.9); }
-body { margin: 0; }
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* cloud blobs */
-body::after {
-  content: ""; position: fixed; inset: auto 0 0 0; height: 45vh; pointer-events: none;
-  background:
-    radial-gradient(40vw 18vh at 10% 80%, var(--cloud), transparent 60%),
-    radial-gradient(38vw 18vh at 40% 90%, var(--cloud), transparent 60%),
-    radial-gradient(42vw 20vh at 70% 88%, var(--cloud), transparent 60%),
-    radial-gradient(40vw 18vh at 95% 85%, var(--cloud), transparent 60%);
-}
-`;
-
-function passwordStrength(pwd){
-  let score = 0;
-  if (!pwd) return { index: 0, label: "", color: "#e5e7eb" };
-  if (pwd.length >= 8) score++;
-  if (/[A-Z]/.test(pwd)) score++;
-  if (/[0-9]/.test(pwd)) score++;
-  if (/[^A-Za-z0-9]/.test(pwd)) score++;
-  const index = Math.min(4, Math.max(1, score));
-  const labels = ["", "Weak", "Fair", "Good", "Strong"];
-  const colors = ["#e5e7eb", "#ef4444", "#f59e0b", "#10b981", "#059669"];
-  return { index, label: labels[index], color: colors[index] };
-}
 
 export default Register;

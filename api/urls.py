@@ -4,7 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DashboardSummary
+from .views import AnnualFeeViewSet, DashboardSummary
 from .views import SingingClassAdmissionViewSet
 
 
@@ -28,6 +28,8 @@ from .views import TrainerViewSet
 from .views import BatchViewSet
 from .views import TeacherViewSet
 from .views import ClassViewSet
+from .views import AnnualFeeViewSet
+
 
 
 router = DefaultRouter()
@@ -67,8 +69,11 @@ router.register(r"sound", SoundViewSet, basename="sound")
 router.register(r"auth/sound", SoundViewSet, basename="auth-sound")  # alias
 
 
-
 router.register(r"singers", SingerViewSet, basename="singer")
+router.register(r"annual-fees", AnnualFeeViewSet, basename="annual-fees")
+
+
+
 
 
 

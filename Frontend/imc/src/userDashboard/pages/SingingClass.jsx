@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
-import Footer from "../../components/Footer";
+import Footer from "../../components/footer";
 import SingerBackground from "../../assets/singerbag.jpg";
 import {
   Loader2,
@@ -666,7 +666,7 @@ export default function SingingClassRegistration() {
         </div>
       </section>
 
-      <Footer />
+      <footer />
     </div>
   );
 }

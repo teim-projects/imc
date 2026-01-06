@@ -439,16 +439,7 @@ const StudioForm = ({ onClose, viewOnly = false }) => {
           >
             View Bookings
           </button>
-          {onClose && (
-            <button
-              type="button"
-              className="btn ghost"
-              style={{ marginLeft: "8px" }}
-              onClick={onClose}
-            >
-              Close
-            </button>
-          )}
+          
         </div>
       </div>
 

@@ -611,37 +611,120 @@ class SoundViewSet(viewsets.ModelViewSet):
 # ====================================================================
 # Singer Master (Service)
 # ====================================================================
-from rest_framework import viewsets, permissions, filters
+from rest_framework import viewsets, permissions, filters, status
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
+
 from .models import Singer
 from .serializers import SingerSerializer
 
 
+# -----------------------------
+# Permission
+# -----------------------------
 class SingerPermission(permissions.BasePermission):
     def has_permission(self, request, view):
+        # Public: list, retrieve, create
         if request.method in ["GET", "POST"]:
             return True
-        return request.user and request.user.is_staff
+        # Staff only: update, delete
+        return bool(request.user and request.user.is_staff)
 
 
+# -----------------------------
+# ViewSet
+# -----------------------------
 class SingerViewSet(viewsets.ModelViewSet):
     queryset = Singer.objects.all().order_by("-created_at")
     serializer_class = SingerSerializer
     permission_classes = [SingerPermission]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    # 🔑 IMPORTANT: string primary key like IMC/SM-002
+    lookup_field = "id"
+
+    # 🔍 Search
     filter_backends = [filters.SearchFilter]
     search_fields = ["id", "name", "city", "genre", "mobile"]
 
+    # -----------------------------
+    # CREATE
+    # -----------------------------
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
             print("❌ SERIALIZER ERRORS:", serializer.errors)
-            return Response(serializer.errors, status=400)
+            return Response(
+                {"success": False, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         self.perform_create(serializer)
-        return Response(serializer.data, status=201)
+        return Response(
+            {"success": True, "data": serializer.data},
+            status=status.HTTP_201_CREATED
+        )
+
+    # -----------------------------
+    # RETRIEVE
+    # -----------------------------
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            singer = self.get_object()
+        except Exception:
+            raise NotFound("Singer not found")
+
+        serializer = self.get_serializer(singer)
+        return Response(
+            {"success": True, "data": serializer.data},
+            status=status.HTTP_200_OK
+        )
+
+    # -----------------------------
+    # UPDATE (PUT / PATCH)
+    # -----------------------------
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+
+        try:
+            singer = self.get_object()
+        except Exception:
+            raise NotFound("Singer not found")
+
+        serializer = self.get_serializer(
+            singer,
+            data=request.data,
+            partial=partial
+        )
+
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "errors": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        self.perform_update(serializer)
+        return Response(
+            {"success": True, "data": serializer.data},
+            status=status.HTTP_200_OK
+        )
+
+    # -----------------------------
+    # DELETE
+    # -----------------------------
+    def destroy(self, request, *args, **kwargs):
+        try:
+            singer = self.get_object()
+        except Exception:
+            raise NotFound("Singer not found")
+
+        singer.delete()
+        return Response(
+            {"success": True, "message": "Singer deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT
+        )
 
 
 
@@ -977,3 +1060,27 @@ class ClassViewSet(ModelViewSet):
 class BatchViewSet(ModelViewSet):
     queryset = Batch.objects.select_related('class_obj', 'trainer').all()
     serializer_class = BatchSerializer  # ← ABSOLUTELY REQUIRED
+
+
+
+
+
+
+
+
+from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAuthenticated
+from .models import AnnualFee
+from .serializers import AnnualFeeSerializer
+
+class AnnualFeeViewSet(ModelViewSet):
+    queryset = AnnualFee.objects.select_related("singer")
+    serializer_class = AnnualFeeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        singer_id = self.request.query_params.get("singer")
+        if singer_id:
+            qs = qs.filter(singer_id=singer_id)
+        return qs

@@ -4,6 +4,7 @@ import {
   Routes,
   Route,
   Navigate,
+  useParams,
 } from "react-router-dom";
 
 /* ================= COMMON ================= */
@@ -42,13 +43,14 @@ import UserStudioRentalForm from "./userDashboard/Forms/UserStudioRentalForm";
 import UserPhotographyBookingForm from "./userDashboard/Forms/UserPhotographyBookingForm";
 import UserEventBookingForm from "./userDashboard/Forms/UserEvents";
 
+/* ================= FEES ================= */
+import AnnualFeePage from "./userDashboard/pages/AnnualFeePage";
+
 /* ================= PAYMENT ================= */
 import PaymentPage from "./userDashboard/payment/PaymentPage";
 
-/* ================= ASSETS ================= */
+/* ================= STYLES ================= */
 import "./App.css";
-import Img1 from "./assets/banner.jpg";
-import Img2 from "./assets/banner1.JPG";
 
 /* ================= AUTH HELPERS ================= */
 const getUserInfo = () => {
@@ -73,14 +75,21 @@ function AdminRoute({ children }) {
   return <Navigate to="/" replace />;
 }
 
-/* ================= MAIN APP LAYOUT ================= */
+/* ================= WRAPPERS ================= */
+function AnnualFeeWrapper() {
+  const { id } = useParams();
+  return <AnnualFeePage singerId={id} />;
+}
+
+/* ================= MAIN LAYOUT ================= */
 function Layout() {
   return (
     <>
       <Navbar />
+
       <main className="app-main">
         <Routes>
-          {/* HOME → UserDashboard (Guest ला पण दिसेल) */}
+          {/* HOME */}
           <Route path="/" element={<UserDashboard />} />
 
           {/* AUTH */}
@@ -92,7 +101,7 @@ function Layout() {
             element={<ResetPasswordConfirm />}
           />
 
-          {/* ADMIN PANEL */}
+          {/* ADMIN */}
           <Route
             path="/dashboard"
             element={
@@ -101,6 +110,7 @@ function Layout() {
               </AdminRoute>
             }
           />
+
           <Route
             path="/admin/singers"
             element={
@@ -110,7 +120,17 @@ function Layout() {
             }
           />
 
-          {/* PROFILE - LOGIN REQUIRED */}
+          {/* ✅ ANNUAL FEE PAGE */}
+          <Route
+            path="/admin/singers/:id/fees"
+            element={
+              <AdminRoute>
+                <AnnualFeeWrapper />
+              </AdminRoute>
+            }
+          />
+
+          {/* PROFILE */}
           <Route
             path="/profile"
             element={
@@ -120,14 +140,14 @@ function Layout() {
             }
           />
 
-          {/* PUBLIC PAGES - कोणालाही दिसतील */}
+          {/* PUBLIC */}
           <Route path="/services" element={<Services />} />
           <Route path="/events" element={<Events />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/classes" element={<SingingClass />} />
           <Route path="/singer" element={<SingerRegistration />} />
 
-          {/* BOOKING PAGES - LOGIN COMPULSORY */}
+          {/* BOOKINGS */}
           <Route
             path="/studio-booking"
             element={
@@ -207,7 +227,7 @@ function Layout() {
             }
           />
 
-          {/* PAYMENT - LOGIN REQUIRED */}
+          {/* PAYMENT */}
           <Route
             path="/payment"
             element={
@@ -222,8 +242,8 @@ function Layout() {
         </Routes>
       </main>
 
-      {/* GLOBAL STYLES */}
-      <style jsx global>{`
+      {/* GLOBAL STYLE FIX */}
+      <style jsx="true">{`
         html,
         body,
         #root {
@@ -240,7 +260,7 @@ function Layout() {
   );
 }
 
-/* ================= ROOT APP ================= */
+/* ================= ROOT ================= */
 export default function App() {
   return (
     <Router>
