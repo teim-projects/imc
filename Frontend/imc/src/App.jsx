@@ -80,12 +80,30 @@ function AnnualFeeWrapper() {
   const { id } = useParams();
   return <AnnualFeePage singerId={id} />;
 }
+import { useLocation } from "react-router-dom";
 
-/* ================= MAIN LAYOUT ================= */
+ 
 function Layout() {
+  const location = useLocation();
+
+  // Routes where navbar should be hidden
+  const hideNavbarRoutes = [
+    "/login",
+    "/register",
+    "/forgot-password",
+  ];
+
+  // Also hide for reset password dynamic route
+  const isResetPassword =
+    location.pathname.startsWith("/password-reset-confirm");
+
+  const hideNavbar =
+    hideNavbarRoutes.includes(location.pathname) || isResetPassword;
+
   return (
     <>
-      <Navbar />
+      {/* ✅ Show navbar only when needed */}
+      {!hideNavbar && <Navbar />}
 
       <main className="app-main">
         <Routes>
@@ -120,7 +138,6 @@ function Layout() {
             }
           />
 
-          {/* ✅ ANNUAL FEE PAGE */}
           <Route
             path="/admin/singers/:id/fees"
             element={
@@ -253,7 +270,7 @@ function Layout() {
           overflow-x: hidden;
         }
         .app-main {
-          min-height: calc(100vh - 70px);
+          min-height: 100vh;
         }
       `}</style>
     </>
