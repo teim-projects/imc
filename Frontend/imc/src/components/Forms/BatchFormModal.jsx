@@ -127,75 +127,82 @@ export default function BatchFormModal({ onClose, onSaved, editData }) {
         {error && <div className="error">{error}</div>}
 
         <form onSubmit={submit}>
-          {/* CLASS */}
-          <label>
-            Class *
-            <select
-              name="class_obj"
-              value={form.class_obj}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Class</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Row 1 */}
+          <div className="grid">
+            <label>
+              Class *
+              <select
+                name="class_obj"
+                value={form.class_obj}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Class</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          {/* TRAINER */}
-          <label>
-            Trainer *
-            <select
-              name="trainer"
-              value={form.trainer}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Trainer</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label>
+              Trainer *
+              <select
+                name="trainer"
+                value={form.trainer}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Trainer</option>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-          {/* DAY */}
-          <label>
-            Day *
-            <select name="day" value={form.day} onChange={handleChange} required>
-              <option value="">Select Day</option>
-              {DAYS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </label>
+          {/* Row 2 */}
+          <div className="grid">
+            <label>
+              Day *
+              <select
+                name="day"
+                value={form.day}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Day</option>
+                {DAYS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          {/* TIME */}
-          <label>
-            Time Slot *
-            <select
-              name="time_slot"
-              value={form.time_slot}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Time</option>
-              {TIMES.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label>
+              Time Slot *
+              <select
+                name="time_slot"
+                value={form.time_slot}
+                onChange={handleChange}
+                required
+              >
+                <option value="">Select Time</option>
+                {TIMES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-          {/* CAPACITY */}
-          <label>
+          {/* Full width */}
+          <label className="full">
             Capacity *
             <input
               type="number"
@@ -203,7 +210,7 @@ export default function BatchFormModal({ onClose, onSaved, editData }) {
               name="capacity"
               value={form.capacity}
               onChange={handleChange}
-              required
+               
             />
           </label>
 
@@ -227,44 +234,65 @@ export default function BatchFormModal({ onClose, onSaved, editData }) {
           align-items: center;
           justify-content: center;
           z-index: 1000;
+          padding: 1rem;
         }
 
         .modal-box {
           background: white;
-          padding: 2rem;
+          padding: 1.5rem;
           border-radius: 14px;
-          width: 440px;
-          max-width: 95%;
+          width: 520px;
+          max-width: 100%;
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+
+        h3 {
+          margin-bottom: 0.8rem;
+          font-size: 1.1rem;
+        }
+
+        .grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 0.9rem;
+          margin-bottom: 0.9rem;
+        }
+
+        .full {
+          margin-bottom: 0.9rem;
         }
 
         label {
           display: flex;
           flex-direction: column;
           gap: 0.35rem;
-          margin-bottom: 1rem;
           font-weight: 500;
+          font-size: 0.9rem;
         }
 
         input,
         select {
-          padding: 0.6rem;
-          border-radius: 0.5rem;
+          padding: 0.55rem 0.65rem;
+          border-radius: 0.45rem;
           border: 1px solid #d1d5db;
+          font-size: 0.9rem;
         }
 
         .actions {
           display: flex;
           justify-content: flex-end;
-          gap: 1rem;
-          margin-top: 1rem;
+          gap: 0.6rem;
+          margin-top: 0.8rem;
         }
 
         button {
-          padding: 0.6rem 1.4rem;
+          padding: 0.45rem 1.2rem;
           border-radius: 999px;
           border: none;
           cursor: pointer;
           font-weight: 600;
+          font-size: 0.85rem;
         }
 
         button:not(.secondary) {
@@ -282,6 +310,14 @@ export default function BatchFormModal({ onClose, onSaved, editData }) {
           padding: 0.6rem;
           border-radius: 0.4rem;
           margin-bottom: 0.6rem;
+          font-size: 0.85rem;
+        }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+          .grid {
+            grid-template-columns: 1fr;
+          }
         }
       `}</style>
     </div>

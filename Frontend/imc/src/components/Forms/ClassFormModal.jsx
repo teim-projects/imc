@@ -26,9 +26,7 @@ export default function ClassFormModal({
   const [loadingTeachers, setLoadingTeachers] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchTeachers();
-    }
+    if (isOpen) fetchTeachers();
   }, [isOpen]);
 
   const fetchTeachers = async () => {
@@ -61,13 +59,13 @@ export default function ClassFormModal({
         <div className="modal-header">
           <h2>{isEdit ? "Edit Class" : "Add Class"}</h2>
           <button onClick={onClose} className="close-btn">
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          {/* CLASS NAME */}
-          <label>
+          {/* FULL */}
+          <label className="full">
             Class Name *
             <input
               type="text"
@@ -79,54 +77,54 @@ export default function ClassFormModal({
             />
           </label>
 
-          {/* TRAINER */}
-          <label>
-            Trainer *
-            <select
-              name="trainer"
-              value={form.trainer || ""}
-              onChange={handleChange}
-              disabled={loadingTeachers}
-              required
-            >
-              <option value="">
-                {loadingTeachers ? "Loading trainers..." : "Select Trainer"}
-              </option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name || `${t.first_name} ${t.last_name}`.trim()}
+          {/* GRID */}
+          <div className="grid">
+            <label>
+              Trainer *
+              <select
+                name="trainer"
+                value={form.trainer || ""}
+                onChange={handleChange}
+                disabled={loadingTeachers}
+                required
+              >
+                <option value="">
+                  {loadingTeachers ? "Loading trainers..." : "Select Trainer"}
                 </option>
-              ))}
-            </select>
-          </label>
+                {teachers.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name || `${t.first_name} ${t.last_name}`.trim()}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          {/* FEE PER MONTH */}
-          <label>
-            Fee Per Month (₹) *
-            <input
-              type="number"
-              name="fee"
-              value={form.fee || ""}
-              onChange={handleChange}
-              placeholder="e.g. 2500"
-              min="0"
-              required
-            />
-          </label>
+            <label>
+              Fee Per Month (₹) *
+              <input
+                type="number"
+                name="fee"
+                value={form.fee || ""}
+                onChange={handleChange}
+                placeholder="e.g. 2500"
+                min="0"
+                required
+              />
+            </label>
+          </div>
 
-          {/* DESCRIPTION */}
-          <label>
+          {/* FULL */}
+          <label className="full">
             Description
             <textarea
               name="description"
-              rows="4"
+              rows="3"
               value={form.description || ""}
               onChange={handleChange}
               placeholder="Class syllabus, goals, etc."
             />
           </label>
 
-          {/* ACTIONS */}
           <div className="actions">
             <button type="submit" disabled={saving} className="save-btn">
               {saving ? "Saving..." : "Save Class"}
@@ -151,116 +149,93 @@ export default function ClassFormModal({
             align-items: center;
             justify-content: center;
             z-index: 1000;
+            padding: 1rem;
           }
 
           .modal-box {
             background: #fff;
-            width: 480px;
-            max-width: 95%;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-            overflow: hidden;
+            width: 560px;
+            max-width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            padding: 1.4rem 1.6rem 1.6rem;
           }
 
           .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1.5rem 2rem 1rem;
+            margin-bottom: 1rem;
           }
 
           .modal-header h2 {
-            font-size: 1.6rem;
+            font-size: 1.15rem;
             font-weight: 700;
-            color: #1e293b;
             margin: 0;
           }
 
           .close-btn {
             background: #ea580c;
             color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
             border: none;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: background 0.2s;
           }
 
-          .close-btn:hover {
-            background: #dc4d05;
-          }
-
-          form {
-            padding: 0 2rem 2rem;
-          }
-
-          label {
-            display: block;
-            margin-bottom: 1.2rem;
+          form label {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
             font-weight: 600;
-            color: #374151;
+            font-size: 0.9rem;
+          }
+
+          .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.9rem;
+            margin-bottom: 0.9rem;
+          }
+
+          .full {
+            margin-bottom: 0.9rem;
           }
 
           input,
           select,
           textarea {
-            width: 100%;
-            padding: 0.9rem 1rem;
-            margin-top: 0.5rem;
-            border-radius: 12px;
+            padding: 0.6rem 0.7rem;
+            border-radius: 0.6rem;
             border: 1px solid #e2e8f0;
             background: #f8fafc;
-            font-size: 1rem;
-            transition: all 0.2s;
-          }
-
-          input:focus,
-          select:focus,
-          textarea:focus {
-            outline: none;
-            border-color: #ea580c;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1);
-          }
-
-          input::placeholder,
-          textarea::placeholder {
-            color: #94a3b8;
+            font-size: 0.9rem;
           }
 
           textarea {
             resize: vertical;
-            min-height: 100px;
-            font-family: inherit;
           }
 
           .actions {
             display: flex;
             justify-content: center;
-            gap: 1rem;
-            margin-top: 2rem;
-            padding-top: 1rem;
+            gap: 0.8rem;
+            margin-top: 1.2rem;
           }
 
           .save-btn {
             background: #ea580c;
             color: white;
-            padding: 0.9rem 2.5rem;
+            padding: 0.6rem 2.2rem;
             border-radius: 999px;
             border: none;
             font-weight: 600;
-            font-size: 1.05rem;
             cursor: pointer;
-            transition: all 0.2s;
-          }
-
-          .save-btn:hover:not(:disabled) {
-            background: #dc4d05;
-            transform: translateY(-2px);
           }
 
           .save-btn:disabled {
@@ -271,15 +246,18 @@ export default function ClassFormModal({
           .cancel-btn {
             background: #e2e8f0;
             color: #475569;
-            padding: 0.9rem 2rem;
+            padding: 0.6rem 1.8rem;
             border-radius: 999px;
             border: none;
             font-weight: 600;
             cursor: pointer;
           }
 
-          .cancel-btn:hover {
-            background: #cbd5e1;
+          /* Mobile */
+          @media (max-width: 600px) {
+            .grid {
+              grid-template-columns: 1fr;
+            }
           }
         `}</style>
       </div>
